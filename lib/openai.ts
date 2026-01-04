@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { ChannelDetails, VideoDetails } from './youtube';
+import { InstagramSearchResult } from './instagram';
 
 // Lazy initialization to avoid build-time errors
 let openaiClient: OpenAI | null = null;
@@ -18,7 +19,9 @@ export interface QualificationResult {
   reason: string;
 }
 
-const SYSTEM_PROMPT = `You are a helpful, intelligent assistant that analyzes YouTube channels to determine if they are relevant leads for my business. You help identify channels owned by online coaches, consultants, educators or experts who share or sell educational advice, courses, communities, coaching or some type of mentorship.`;
+const YOUTUBE_SYSTEM_PROMPT = `You are a helpful, intelligent assistant that analyzes YouTube channels to determine if they are relevant leads for my business. You help identify channels owned by online coaches, consultants, educators or experts who share or sell educational advice, courses, communities, coaching or some type of mentorship.`;
+
+const INSTAGRAM_SYSTEM_PROMPT = `You are a helpful, intelligent assistant that analyzes Instagram profiles to determine if they are relevant leads for my business. You help identify accounts owned by online coaches, consultants, educators or experts who share or sell educational advice, courses, communities, coaching or some type of mentorship.`;
 
 function buildUserPrompt(
   channel: ChannelDetails,
@@ -94,7 +97,7 @@ export async function qualifyCreator(
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: YOUTUBE_SYSTEM_PROMPT },
         { role: 'user', content: buildUserPrompt(channel, videos, descriptionLinks) },
       ],
       response_format: { type: 'json_object' },
@@ -110,6 +113,107 @@ export async function qualifyCreator(
     return result;
   } catch (error) {
     console.error('OpenAI qualification error:', error);
+    return {
+      qualified: false,
+      reason: `Error during qualification: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+}
+
+/**
+ * Build Instagram-specific qualification prompt
+ */
+function buildInstagramPrompt(profile: InstagramSearchResult): string {
+  const recentPostsText = profile.recentPosts
+    .slice(0, 5)
+    .map((p, i) => `Post ${i + 1}: ${p.caption?.slice(0, 300) || 'No caption'}`)
+    .join('\n\n');
+
+  return `Your task is to analyze Instagram profiles and decide if they are qualified leads for my business and outreach campaigns.
+
+I want you to pay close attention to all sources of information: the profile's username, full name, bio, external URL, follower count, and recent post captions.
+
+Use all this information to determine if the Instagram account owner is likely to offer or sell advice, courses, coaching, consulting, communities, or mentorship programs, which would make them qualified.
+
+If you can identify any links in the bio to Skool, Whop, Patreon, Teachable, Kajabi, Stan Store, Linktree (with course/coaching links), or any platform for communities/courses/coaching, that is a strong indicator of qualification.
+
+If you can identify words in the bio or posts such as "coach", "mentor", "consulting", "DM me", "link in bio", "free guide", "apply", "work with me", "my program", "my course", "my community", or similar intent, that is a strong indicator of qualification.
+
+---
+
+Use the below information for your qualification process:
+
+Username: @${profile.username}
+Full Name: ${profile.fullName || 'N/A'}
+Bio: ${profile.biography || 'N/A'}
+External URL: ${profile.externalUrl || 'N/A'}
+Followers: ${profile.followersCount?.toLocaleString() || 0}
+Following: ${profile.followsCount?.toLocaleString() || 0}
+Posts: ${profile.postsCount?.toLocaleString() || 0}
+Business Account: ${profile.isBusinessAccount ? 'Yes' : 'No'}
+Business Category: ${profile.businessCategoryName || 'N/A'}
+Engagement Rate: ${profile.engagementRate}%
+
+Recent Posts:
+${recentPostsText || 'No recent posts available'}
+
+---
+
+Qualification rules:
+
+1. Be opportunity aware — Mark as qualified if there's reasonable evidence the Instagram account involves someone who offers or sells advice, courses, coaching, communities, consulting, or mentorship. The goal is to find potentially monetized knowledge-based businesses.
+2. Look for coaching/consulting signals in the bio - terms like "coach", "mentor", "helping X achieve Y", "DM for info", links to booking pages, etc.
+3. Business accounts in relevant categories (Coach, Entrepreneur, Consultant, etc.) are strong signals.
+4. If the content appears to be in a non-English language, mark it as not qualified.
+5. If the account seems to primarily target audiences in developing/third-world countries, mark it as not qualified.
+6. Focus on creators who seem to target English-speaking business owners or professionals.
+7. Minimum follower threshold: Accounts with fewer than 1,000 followers should generally not be qualified unless they show very strong coaching/consulting signals.
+8. Exclude:
+   - Personal accounts without business intent
+   - Meme/entertainment accounts
+   - News/media accounts
+   - Brand accounts for products (not services)
+   - Accounts that just repost motivational quotes without original content
+
+---
+
+Return two clean, separate JSON fields - one called "qualified" (true or false) - and one called "reason" (a short explanation starting with the username so I can identify who you're talking about).
+
+Return only valid JSON with two top-level fields:
+
+{
+  "qualified": true or false,
+  "reason": "string explaining why you made this decision"
+}`;
+}
+
+/**
+ * Qualify an Instagram creator using AI
+ */
+export async function qualifyInstagramCreator(
+  profile: InstagramSearchResult
+): Promise<QualificationResult> {
+  try {
+    const openai = getOpenAIClient();
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: INSTAGRAM_SYSTEM_PROMPT },
+        { role: 'user', content: buildInstagramPrompt(profile) },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      return { qualified: false, reason: 'No response from AI' };
+    }
+
+    const result = JSON.parse(content) as QualificationResult;
+    return result;
+  } catch (error) {
+    console.error('OpenAI Instagram qualification error:', error);
     return {
       qualified: false,
       reason: `Error during qualification: ${error instanceof Error ? error.message : 'Unknown error'}`,

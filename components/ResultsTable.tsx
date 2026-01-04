@@ -2,18 +2,32 @@
 
 import { useState } from 'react';
 
+type Platform = 'youtube' | 'instagram' | 'tiktok' | 'linkedin' | 'skool' | 'substack';
+
 interface Creator {
   id: number;
-  channelId: string;
-  channelName: string;
-  channelUrl: string;
-  subscribers: number;
-  videoCount: number;
-  totalViews: number;
+  platform?: Platform;
+  platformId?: string;
+  username?: string | null;
+  displayName?: string;
+  profileUrl?: string;
+  followers?: number;
+  following?: number;
+  postCount?: number;
+  totalViews?: number;
+  engagementRate?: number;
+  bio?: string | null;
+  externalUrl?: string | null;
   qualified: boolean;
   qualificationReason: string;
   email: string | null;
   firstName: string | null;
+  // Legacy fields for backward compatibility
+  channelId?: string;
+  channelName?: string;
+  channelUrl?: string;
+  subscribers?: number;
+  videoCount?: number;
 }
 
 interface Summary {
@@ -27,28 +41,63 @@ interface ResultsTableProps {
   summary: Summary;
   jobId: string;
   showAll?: boolean;
+  platform?: Platform;
 }
 
-type SortField = 'channelName' | 'subscribers' | 'videoCount' | 'qualified';
+type SortField = 'displayName' | 'followers' | 'postCount' | 'qualified';
 type SortDirection = 'asc' | 'desc';
 
-export default function ResultsTable({ creators, summary, jobId }: ResultsTableProps) {
-  const [sortField, setSortField] = useState<SortField>('subscribers');
+const PLATFORM_CONFIG: Record<Platform, { icon: string; name: string; followersLabel: string; postsLabel: string }> = {
+  youtube: { icon: '📺', name: 'YouTube', followersLabel: 'Subs', postsLabel: 'Videos' },
+  instagram: { icon: '📸', name: 'Instagram', followersLabel: 'Followers', postsLabel: 'Posts' },
+  tiktok: { icon: '🎵', name: 'TikTok', followersLabel: 'Followers', postsLabel: 'Videos' },
+  linkedin: { icon: '💼', name: 'LinkedIn', followersLabel: 'Connections', postsLabel: 'Posts' },
+  skool: { icon: '🎓', name: 'Skool', followersLabel: 'Members', postsLabel: 'Posts' },
+  substack: { icon: '📝', name: 'Substack', followersLabel: 'Subscribers', postsLabel: 'Posts' },
+};
+
+export default function ResultsTable({ creators, summary, jobId, platform = 'youtube' }: ResultsTableProps) {
+  const [sortField, setSortField] = useState<SortField>('followers');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [filterQualified, setFilterQualified] = useState(true);
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+
+  const config = PLATFORM_CONFIG[platform];
+
+  // Helper to get display values with backward compatibility
+  const getDisplayName = (c: Creator) => c.displayName || c.channelName || 'Unknown';
+  const getProfileUrl = (c: Creator) => c.profileUrl || c.channelUrl || '#';
+  const getFollowers = (c: Creator) => c.followers || c.subscribers || 0;
+  const getPostCount = (c: Creator) => c.postCount || c.videoCount || 0;
+  const getUsername = (c: Creator) => c.username || null;
 
   const filteredCreators = filterQualified
     ? creators.filter((c) => c.qualified)
     : creators;
 
   const sortedCreators = [...filteredCreators].sort((a, b) => {
-    let aVal: string | number | boolean = a[sortField];
-    let bVal: string | number | boolean = b[sortField];
+    let aVal: string | number | boolean;
+    let bVal: string | number | boolean;
 
-    if (typeof aVal === 'string') {
-      aVal = aVal.toLowerCase();
-      bVal = (bVal as string).toLowerCase();
+    switch (sortField) {
+      case 'displayName':
+        aVal = getDisplayName(a).toLowerCase();
+        bVal = getDisplayName(b).toLowerCase();
+        break;
+      case 'followers':
+        aVal = getFollowers(a);
+        bVal = getFollowers(b);
+        break;
+      case 'postCount':
+        aVal = getPostCount(a);
+        bVal = getPostCount(b);
+        break;
+      case 'qualified':
+        aVal = a.qualified;
+        bVal = b.qualified;
+        break;
+      default:
+        return 0;
     }
 
     if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
@@ -84,6 +133,12 @@ export default function ResultsTable({ creators, summary, jobId }: ResultsTableP
 
   // Check if this is a "gold moment" - qualified with email
   const isGoldMoment = (creator: Creator) => creator.qualified && creator.email;
+
+  // Get platform icon for a creator
+  const getPlatformIcon = (c: Creator) => {
+    const creatorPlatform = c.platform || platform;
+    return PLATFORM_CONFIG[creatorPlatform]?.icon || '📺';
+  };
 
   return (
     <div className="bg-[var(--bg-surface)] border border-[var(--bg-border)] rounded-xl overflow-hidden">
@@ -171,22 +226,22 @@ export default function ResultsTable({ creators, summary, jobId }: ResultsTableP
           <thead>
             <tr className="bg-[var(--bg-elevated)]">
               <th
-                onClick={() => handleSort('channelName')}
+                onClick={() => handleSort('displayName')}
                 className="px-6 py-3 text-left text-xs font-mono font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-secondary)] transition-colors"
               >
-                Channel <SortIcon field="channelName" />
+                {platform === 'youtube' ? 'Channel' : 'Creator'} <SortIcon field="displayName" />
               </th>
               <th
-                onClick={() => handleSort('subscribers')}
+                onClick={() => handleSort('followers')}
                 className="px-6 py-3 text-right text-xs font-mono font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-secondary)] transition-colors"
               >
-                Subs <SortIcon field="subscribers" />
+                {config.followersLabel} <SortIcon field="followers" />
               </th>
               <th
-                onClick={() => handleSort('videoCount')}
+                onClick={() => handleSort('postCount')}
                 className="px-6 py-3 text-right text-xs font-mono font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-secondary)] transition-colors"
               >
-                Videos <SortIcon field="videoCount" />
+                {config.postsLabel} <SortIcon field="postCount" />
               </th>
               <th className="px-6 py-3 text-left text-xs font-mono font-medium text-[var(--text-muted)] uppercase tracking-wider">
                 Email
@@ -230,33 +285,41 @@ export default function ResultsTable({ creators, summary, jobId }: ResultsTableP
                         : 'hover:bg-[var(--bg-elevated)]'
                     } ${gold ? 'border-l-2 border-l-[var(--accent-gold)]' : creator.qualified ? 'border-l-2 border-l-[var(--signal-success)]' : ''}`}
                   >
-                    {/* Channel Name */}
+                    {/* Creator Name */}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <a
-                        href={creator.channelUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`font-medium transition-colors ${
-                          gold
-                            ? 'text-[var(--accent-gold)] hover:text-[var(--text-primary)]'
-                            : 'text-[var(--text-primary)] hover:text-[var(--signal-action)]'
-                        }`}
-                      >
-                        {creator.channelName}
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{getPlatformIcon(creator)}</span>
+                        <div className="flex flex-col">
+                          <a
+                            href={getProfileUrl(creator)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`font-medium transition-colors ${
+                              gold
+                                ? 'text-[var(--accent-gold)] hover:text-[var(--text-primary)]'
+                                : 'text-[var(--text-primary)] hover:text-[var(--signal-action)]'
+                            }`}
+                          >
+                            {getDisplayName(creator)}
+                          </a>
+                          {getUsername(creator) && (
+                            <span className="text-xs text-[var(--text-muted)]">@{getUsername(creator)}</span>
+                          )}
+                        </div>
+                      </div>
                     </td>
 
-                    {/* Subscribers */}
+                    {/* Followers */}
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <span className="font-mono text-[var(--text-secondary)]">
-                        {formatNumber(creator.subscribers)}
+                        {formatNumber(getFollowers(creator))}
                       </span>
                     </td>
 
-                    {/* Videos */}
+                    {/* Posts/Videos */}
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <span className="font-mono text-[var(--text-secondary)]">
-                        {creator.videoCount}
+                        {getPostCount(creator)}
                       </span>
                     </td>
 

@@ -1,15 +1,22 @@
 import { searchYouTubeChannels, scrapeChannelEmail } from './apify';
 import { getChannelDetails, getRecentVideos } from './youtube';
-import { qualifyCreator } from './openai';
-import { createJob, updateJobStatus, addCreator, getJob } from './db';
+import { searchInstagramByHashtags, searchInstagramProfiles, generateInstagramHashtags, extractEmailFromBio } from './instagram';
+import { qualifyCreator, qualifyInstagramCreator } from './openai';
+import { createJob, updateJobStatus, addCreator, getJob, Platform } from './db';
 import { v4 as uuidv4 } from 'uuid';
 
+// YouTube thresholds
 const MIN_SUBSCRIBERS = 2000;
 const MIN_VIDEOS = 5;
+
+// Instagram thresholds
+const MIN_FOLLOWERS = 1000;
+const MIN_POSTS = 10;
 
 export interface SearchJobInput {
   keyword: string;
   maxResults: number;
+  platform: Platform;
 }
 
 /**
@@ -18,21 +25,30 @@ export interface SearchJobInput {
  */
 export function startSearchJob(input: SearchJobInput): string {
   const jobId = uuidv4();
-  createJob(jobId, input.keyword, input.maxResults);
+  const platform = input.platform || 'youtube';
+  createJob(jobId, input.keyword, input.maxResults, platform);
 
-  // Start processing in the background (non-blocking)
-  processSearchJob(jobId, input.keyword, input.maxResults).catch((error) => {
-    console.error(`Job ${jobId} failed:`, error);
-    updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
-  });
+  // Start processing in the background based on platform
+  if (platform === 'instagram') {
+    processInstagramJob(jobId, input.keyword, input.maxResults).catch((error) => {
+      console.error(`Instagram Job ${jobId} failed:`, error);
+      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+    });
+  } else {
+    // Default to YouTube
+    processYouTubeJob(jobId, input.keyword, input.maxResults).catch((error) => {
+      console.error(`YouTube Job ${jobId} failed:`, error);
+      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+    });
+  }
 
   return jobId;
 }
 
 /**
- * Process a search job - this runs asynchronously
+ * Process a YouTube search job - this runs asynchronously
  */
-async function processSearchJob(
+async function processYouTubeJob(
   jobId: string,
   keyword: string,
   maxResults: number
@@ -41,7 +57,7 @@ async function processSearchJob(
     updateJobStatus(jobId, 'processing');
 
     // Step 1: Search YouTube channels via Apify
-    console.log(`[${jobId}] Searching for channels with keyword: ${keyword}`);
+    console.log(`[${jobId}] Searching YouTube for channels with keyword: ${keyword}`);
     const searchResults = await searchYouTubeChannels(keyword, maxResults);
     console.log(`[${jobId}] Found ${searchResults.length} channels`);
 
@@ -115,19 +131,25 @@ async function processSearchJob(
           }
         }
 
-        // Save to database
+        // Save to database with new schema
         addCreator({
           job_id: jobId,
-          channel_id: channel.channelId,
-          channel_name: channel.channelName,
-          channel_url: channel.channelUrl,
-          subscribers: channelDetails.subscriberCount,
-          video_count: channelDetails.videoCount,
+          platform: 'youtube',
+          platform_id: channel.channelId,
+          username: null,
+          display_name: channel.channelName,
+          profile_url: channel.channelUrl,
+          followers: channelDetails.subscriberCount,
+          following: 0,
+          post_count: channelDetails.videoCount,
           total_views: channelDetails.viewCount,
+          engagement_rate: 0,
+          bio: channelDetails.description || null,
+          external_url: null,
           qualified: qualification.qualified,
           qualification_reason: qualification.reason,
           email: email,
-          first_name: null, // Can add later
+          first_name: null,
         });
 
         updateJobStatus(jobId, 'processing', i + 1, channels.length);
@@ -143,9 +165,146 @@ async function processSearchJob(
 
     // Mark job as complete
     updateJobStatus(jobId, 'completed', channels.length, channels.length);
-    console.log(`[${jobId}] Job completed successfully`);
+    console.log(`[${jobId}] YouTube job completed successfully`);
   } catch (error) {
-    console.error(`[${jobId}] Job failed:`, error);
+    console.error(`[${jobId}] YouTube job failed:`, error);
+    updateJobStatus(
+      jobId,
+      'failed',
+      undefined,
+      undefined,
+      error instanceof Error ? error.message : 'Unknown error'
+    );
+  }
+}
+
+/**
+ * Process an Instagram search job - this runs asynchronously
+ */
+async function processInstagramJob(
+  jobId: string,
+  keyword: string,
+  maxResults: number
+): Promise<void> {
+  try {
+    updateJobStatus(jobId, 'processing');
+
+    // Step 1: Try profile search first (direct keyword search for users)
+    console.log(`[${jobId}] Searching Instagram profiles for keyword: ${keyword}`);
+    let searchResults = await searchInstagramProfiles(keyword, maxResults);
+
+    // Step 2: If profile search didn't return enough results, also try hashtag search
+    if (searchResults.length < maxResults / 2) {
+      console.log(`[${jobId}] Profile search found ${searchResults.length} results, also trying hashtag search...`);
+      const hashtags = generateInstagramHashtags(keyword);
+      console.log(`[${jobId}] Searching Instagram with hashtags: ${hashtags.join(', ')}`);
+      const hashtagResults = await searchInstagramByHashtags(hashtags, maxResults);
+
+      // Combine results, avoiding duplicates
+      const existingUsernames = new Set(searchResults.map(r => r.username));
+      for (const result of hashtagResults) {
+        if (!existingUsernames.has(result.username)) {
+          searchResults.push(result);
+          existingUsernames.add(result.username);
+        }
+      }
+    }
+
+    console.log(`[${jobId}] Found ${searchResults.length} total Instagram profiles`);
+
+    // Deduplicate by username
+    const uniqueProfiles = new Map<string, typeof searchResults[0]>();
+    for (const result of searchResults) {
+      if (result.username && !uniqueProfiles.has(result.username)) {
+        uniqueProfiles.set(result.username, result);
+      }
+    }
+
+    const profiles = Array.from(uniqueProfiles.values());
+    updateJobStatus(jobId, 'processing', 0, profiles.length);
+
+    // Step 3: Process each profile
+    for (let i = 0; i < profiles.length; i++) {
+      const profile = profiles[i];
+
+      // Check if job was cancelled or failed
+      const currentJob = getJob(jobId);
+      if (currentJob?.status === 'failed') {
+        console.log(`[${jobId}] Job was cancelled, stopping processing`);
+        return;
+      }
+
+      console.log(`[${jobId}] Processing Instagram profile ${i + 1}/${profiles.length}: @${profile.username}`);
+
+      try {
+        // Pre-filter by follower count
+        if (profile.followersCount < MIN_FOLLOWERS) {
+          console.log(`[${jobId}] Skipping @${profile.username} - only ${profile.followersCount} followers`);
+          updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+          continue;
+        }
+
+        // Pre-filter by post count
+        if (profile.postsCount < MIN_POSTS) {
+          console.log(`[${jobId}] Skipping @${profile.username} - only ${profile.postsCount} posts`);
+          updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+          continue;
+        }
+
+        // AI Qualification
+        const qualification = await qualifyInstagramCreator(profile);
+
+        console.log(`[${jobId}] @${profile.username}: qualified=${qualification.qualified}`);
+
+        // Try to extract email from bio
+        let email: string | null = null;
+        if (qualification.qualified) {
+          email = extractEmailFromBio(profile.biography || '');
+          if (email) {
+            console.log(`[${jobId}] Found email for @${profile.username}: ${email}`);
+          }
+        }
+
+        // Extract first name from full name
+        const firstName = profile.fullName ? profile.fullName.split(' ')[0] : null;
+
+        // Save to database
+        addCreator({
+          job_id: jobId,
+          platform: 'instagram',
+          platform_id: profile.userId,
+          username: profile.username,
+          display_name: profile.fullName || profile.username,
+          profile_url: `https://instagram.com/${profile.username}`,
+          followers: profile.followersCount,
+          following: profile.followsCount,
+          post_count: profile.postsCount,
+          total_views: 0, // Instagram doesn't expose total views
+          engagement_rate: profile.engagementRate,
+          bio: profile.biography || null,
+          external_url: profile.externalUrl || null,
+          qualified: qualification.qualified,
+          qualification_reason: qualification.reason,
+          email: email,
+          first_name: firstName,
+        });
+
+        updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+
+        // Small delay to avoid rate limiting
+        await sleep(500);
+      } catch (error) {
+        console.error(`[${jobId}] Error processing Instagram profile @${profile.username}:`, error);
+        // Continue with next profile
+        updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+      }
+    }
+
+    // Mark job as complete
+    updateJobStatus(jobId, 'completed', profiles.length, profiles.length);
+    console.log(`[${jobId}] Instagram job completed successfully`);
+  } catch (error) {
+    console.error(`[${jobId}] Instagram job failed:`, error);
     updateJobStatus(
       jobId,
       'failed',

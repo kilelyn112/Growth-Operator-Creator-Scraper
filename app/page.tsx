@@ -6,23 +6,38 @@ import JobStatus from '@/components/JobStatus';
 import ResultsTable from '@/components/ResultsTable';
 import { Niche } from '@/lib/niches';
 
+type Platform = 'youtube' | 'instagram' | 'tiktok' | 'linkedin' | 'skool' | 'substack';
+
 interface Creator {
   id: number;
-  channelId: string;
-  channelName: string;
-  channelUrl: string;
-  subscribers: number;
-  videoCount: number;
+  platform: Platform;
+  platformId: string;
+  username: string | null;
+  displayName: string;
+  profileUrl: string;
+  followers: number;
+  following: number;
+  postCount: number;
   totalViews: number;
+  engagementRate: number;
+  bio: string | null;
+  externalUrl: string | null;
   qualified: boolean;
   qualificationReason: string;
   email: string | null;
   firstName: string | null;
+  // Legacy fields for backward compatibility
+  channelId?: string;
+  channelName?: string;
+  channelUrl?: string;
+  subscribers?: number;
+  videoCount?: number;
 }
 
 interface Job {
   id: string;
   keyword: string;
+  platform: Platform;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
   total: number;
@@ -35,6 +50,15 @@ interface Summary {
   withEmail: number;
 }
 
+const PLATFORMS: { id: Platform; name: string; icon: string; available: boolean }[] = [
+  { id: 'youtube', name: 'YouTube', icon: '📺', available: true },
+  { id: 'instagram', name: 'Instagram', icon: '📸', available: true },
+  { id: 'tiktok', name: 'TikTok', icon: '🎵', available: false },
+  { id: 'linkedin', name: 'LinkedIn', icon: '💼', available: false },
+  { id: 'skool', name: 'Skool', icon: '🎓', available: false },
+  { id: 'substack', name: 'Substack', icon: '📝', available: false },
+];
+
 export default function Home() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
@@ -43,6 +67,7 @@ export default function Home() {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedNiche, setSelectedNiche] = useState<Niche | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('youtube');
   const [maxResults, setMaxResults] = useState(50);
 
   const pollJob = useCallback(async (id: string) => {
@@ -85,7 +110,7 @@ export default function Home() {
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword, maxResults }),
+        body: JSON.stringify({ keyword, maxResults, platform: selectedPlatform }),
       });
 
       if (!response.ok) {
@@ -178,6 +203,41 @@ export default function Home() {
           {/* Niche Picker - Show when no active job */}
           {!job && (
             <div className="space-y-8">
+              {/* Platform Selector */}
+              <div className="max-w-2xl mx-auto">
+                <div className="text-center mb-4">
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                    Select Platform
+                  </h2>
+                </div>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {PLATFORMS.map((platform) => (
+                    <button
+                      key={platform.id}
+                      onClick={() => platform.available && setSelectedPlatform(platform.id)}
+                      disabled={!platform.available || isSearching}
+                      className={`
+                        flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all duration-200
+                        ${selectedPlatform === platform.id
+                          ? 'bg-[var(--signal-action-dim)] border-[var(--signal-action)] text-[var(--signal-action)]'
+                          : platform.available
+                            ? 'bg-[var(--bg-surface)] border-[var(--bg-border)] text-[var(--text-secondary)] hover:border-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                            : 'bg-[var(--bg-surface)] border-[var(--bg-border)] text-[var(--text-muted)] opacity-50 cursor-not-allowed'
+                        }
+                      `}
+                    >
+                      <span className="text-xl">{platform.icon}</span>
+                      <span className="font-medium">{platform.name}</span>
+                      {!platform.available && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-deep)] text-[var(--text-muted)]">
+                          Soon
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Max Results Control */}
               <div className="max-w-lg mx-auto">
                 <div className="bg-[var(--bg-surface)] border border-[var(--bg-border)] rounded-xl p-5">
@@ -187,7 +247,7 @@ export default function Home() {
                         Scan Depth
                       </label>
                       <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                        Channels to analyze per search
+                        {selectedPlatform === 'youtube' ? 'Channels' : 'Profiles'} to analyze per search
                       </p>
                     </div>
                     <div className="text-right">
@@ -245,10 +305,14 @@ export default function Home() {
           {/* Active Hunt View */}
           {job && (
             <div className="space-y-6">
-              {/* Selected Niche Badge */}
+              {/* Selected Platform & Niche Badge */}
               {selectedNiche && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-sm text-[var(--text-muted)]">Target:</span>
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--bg-border)] text-[var(--text-secondary)] font-medium text-sm">
+                    {PLATFORMS.find(p => p.id === selectedPlatform)?.icon}
+                    {PLATFORMS.find(p => p.id === selectedPlatform)?.name}
+                  </span>
                   <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--signal-action-dim)] border border-[var(--signal-action)] text-[var(--signal-action)] font-semibold">
                     <span className="w-2 h-2 rounded-full bg-[var(--signal-action)] animate-pulse"></span>
                     {selectedNiche.name}
@@ -271,6 +335,7 @@ export default function Home() {
                   creators={creators}
                   summary={summary}
                   jobId={jobId}
+                  platform={selectedPlatform}
                 />
               )}
 
