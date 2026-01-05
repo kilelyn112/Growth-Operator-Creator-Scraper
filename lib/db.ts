@@ -5,7 +5,7 @@ const dbPath = path.join(process.cwd(), 'jobs.db');
 const db = new Database(dbPath);
 
 // Platform types
-export type Platform = 'youtube' | 'instagram' | 'tiktok' | 'linkedin' | 'skool' | 'substack';
+export type Platform = 'youtube' | 'instagram' | 'x' | 'tiktok' | 'linkedin' | 'skool' | 'substack';
 
 // Initialize tables with multi-platform support
 db.exec(`
@@ -257,6 +257,18 @@ export function getQualifiedCreatorsByJobId(jobId: string): Creator[] {
   const stmt = db.prepare('SELECT * FROM creators WHERE job_id = ? AND qualified = 1 ORDER BY followers DESC');
   const rows = stmt.all(jobId) as (Omit<Creator, 'qualified'> & { qualified: number })[];
   return rows.map(row => ({ ...row, qualified: Boolean(row.qualified) }));
+}
+
+// Get existing platform IDs and usernames for a job (for deduplication)
+export function getExistingIdentifiers(jobId: string): Set<string> {
+  const stmt = db.prepare('SELECT platform_id, username FROM creators WHERE job_id = ?');
+  const rows = stmt.all(jobId) as { platform_id: string; username: string | null }[];
+  const identifiers = new Set<string>();
+  for (const row of rows) {
+    if (row.platform_id) identifiers.add(row.platform_id.toLowerCase());
+    if (row.username) identifiers.add(row.username.toLowerCase());
+  }
+  return identifiers;
 }
 
 export default db;

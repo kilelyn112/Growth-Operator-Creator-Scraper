@@ -1,22 +1,27 @@
 import { searchYouTubeChannels, scrapeChannelEmail } from './apify';
 import { getChannelDetails, getRecentVideos } from './youtube';
-import { searchInstagramByHashtags, searchInstagramProfiles, generateInstagramHashtags, extractEmailFromBio } from './instagram';
-import { qualifyCreator, qualifyInstagramCreator } from './openai';
-import { createJob, updateJobStatus, addCreator, getJob, Platform } from './db';
+import { searchInstagramByHashtags, searchInstagramProfiles, searchInstagramBySeedAccounts, searchInstagramCoaches, generateInstagramHashtags, extractEmailFromBio, getInstagramProfiles } from './instagram';
+import { qualifyCreator, qualifyInstagramCreator, qualifyXCreator } from './openai';
+import { createJob, updateJobStatus, addCreator, getJob, getExistingIdentifiers, getCreatorsByJobId, Platform } from './db';
+import { searchGoogleForCreators, convertSerpResultToXProfile } from './serpapi';
 import { v4 as uuidv4 } from 'uuid';
 
 // YouTube thresholds
 const MIN_SUBSCRIBERS = 2000;
 const MIN_VIDEOS = 5;
 
-// Instagram thresholds
+// Instagram thresholds (for SerpAPI results, we're less strict since Google found them)
 const MIN_FOLLOWERS = 1000;
 const MIN_POSTS = 10;
+
+// X thresholds
+const MIN_X_FOLLOWERS = 500;
 
 export interface SearchJobInput {
   keyword: string;
   maxResults: number;
   platform: Platform;
+  seedAccounts?: string[]; // Optional seed accounts for Instagram seed-based search
 }
 
 /**
@@ -26,16 +31,26 @@ export interface SearchJobInput {
 export function startSearchJob(input: SearchJobInput): string {
   const jobId = uuidv4();
   const platform = input.platform || 'youtube';
+  console.log(`[${jobId}] Starting job with platform: "${platform}"`);
   createJob(jobId, input.keyword, input.maxResults, platform);
 
   // Start processing in the background based on platform
   if (platform === 'instagram') {
-    processInstagramJob(jobId, input.keyword, input.maxResults).catch((error) => {
+    console.log(`[${jobId}] Routing to Instagram job processor`);
+
+    processInstagramJob(jobId, input.keyword, input.maxResults, input.seedAccounts).catch((error) => {
       console.error(`Instagram Job ${jobId} failed:`, error);
+      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+    });
+  } else if (platform === 'x') {
+    console.log(`[${jobId}] Routing to X job processor`);
+    processXJob(jobId, input.keyword, input.maxResults).catch((error) => {
+      console.error(`X Job ${jobId} failed:`, error);
       updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
     });
   } else {
     // Default to YouTube
+    console.log(`[${jobId}] Routing to YouTube job processor (platform="${platform}")`);
     processYouTubeJob(jobId, input.keyword, input.maxResults).catch((error) => {
       console.error(`YouTube Job ${jobId} failed:`, error);
       updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
@@ -180,35 +195,68 @@ async function processYouTubeJob(
 
 /**
  * Process an Instagram search job - this runs asynchronously
+ * Uses SerpAPI (Google search) as primary discovery method
  */
 async function processInstagramJob(
   jobId: string,
   keyword: string,
-  maxResults: number
+  maxResults: number,
+  seedAccounts?: string[]
 ): Promise<void> {
   try {
     updateJobStatus(jobId, 'processing');
 
-    // Step 1: Try profile search first (direct keyword search for users)
-    console.log(`[${jobId}] Searching Instagram profiles for keyword: ${keyword}`);
-    let searchResults = await searchInstagramProfiles(keyword, maxResults);
+    const profilesToFetch = Math.min(maxResults * 2, 100); // Fetch 2x since some may be filtered
 
-    // Step 2: If profile search didn't return enough results, also try hashtag search
-    if (searchResults.length < maxResults / 2) {
-      console.log(`[${jobId}] Profile search found ${searchResults.length} results, also trying hashtag search...`);
-      const hashtags = generateInstagramHashtags(keyword);
-      console.log(`[${jobId}] Searching Instagram with hashtags: ${hashtags.join(', ')}`);
-      const hashtagResults = await searchInstagramByHashtags(hashtags, maxResults);
+    let usernames: string[] = [];
 
-      // Combine results, avoiding duplicates
-      const existingUsernames = new Set(searchResults.map(r => r.username));
-      for (const result of hashtagResults) {
-        if (!existingUsernames.has(result.username)) {
-          searchResults.push(result);
-          existingUsernames.add(result.username);
+    // PRIMARY METHOD: Use SerpAPI/Google search to find Instagram profiles
+    // This finds profiles with coaching language in their bios (indexed by Google)
+    console.log(`[${jobId}] Using SERPAPI/Google search for Instagram profiles: ${keyword}`);
+    const serpResults = await searchGoogleForCreators(keyword, 'instagram', profilesToFetch);
+    console.log(`[${jobId}] SerpAPI found ${serpResults.length} Instagram profiles`);
+
+    // Extract usernames from SerpAPI results
+    usernames = serpResults.map(r => r.username);
+
+    // FALLBACK: If SerpAPI didn't find enough and seed accounts provided, use seed-based search
+    if (usernames.length < profilesToFetch / 2 && seedAccounts && seedAccounts.length > 0) {
+      console.log(`[${jobId}] Supplementing with seed-based search...`);
+      const seedResults = await searchInstagramBySeedAccounts(seedAccounts, profilesToFetch - usernames.length);
+      const existingUsernames = new Set(usernames.map(u => u.toLowerCase()));
+      for (const result of seedResults) {
+        if (!existingUsernames.has(result.username.toLowerCase())) {
+          usernames.push(result.username);
+          existingUsernames.add(result.username.toLowerCase());
         }
       }
+      console.log(`[${jobId}] After seed search: ${usernames.length} total profiles`);
     }
+
+    console.log(`[${jobId}] Found ${usernames.length} unique Instagram usernames`);
+
+    // Get full profile details for all usernames via Apify
+    console.log(`[${jobId}] Fetching full profile details for ${usernames.length} users...`);
+    const fetchedProfiles = await getInstagramProfiles(usernames);
+    console.log(`[${jobId}] Retrieved ${fetchedProfiles.length} full profiles`);
+
+    // Convert profiles to search results format
+    const searchResults = fetchedProfiles.map(profile => ({
+      username: profile.username,
+      userId: profile.id,
+      fullName: profile.fullName,
+      biography: profile.biography,
+      externalUrl: profile.externalUrl,
+      followersCount: profile.followersCount,
+      followsCount: profile.followsCount,
+      postsCount: profile.postsCount,
+      isVerified: profile.isVerified,
+      isBusinessAccount: profile.isBusinessAccount,
+      businessCategoryName: profile.businessCategoryName,
+      profilePicUrl: profile.profilePicUrl,
+      engagementRate: 0,
+      recentPosts: [] as { caption: string; likesCount: number; commentsCount: number; timestamp: string }[],
+    }));
 
     console.log(`[${jobId}] Found ${searchResults.length} total Instagram profiles`);
 
@@ -251,8 +299,8 @@ async function processInstagramJob(
           continue;
         }
 
-        // AI Qualification
-        const qualification = await qualifyInstagramCreator(profile);
+        // AI Qualification (pass keyword for niche-specific filtering)
+        const qualification = await qualifyInstagramCreator(profile, keyword);
 
         console.log(`[${jobId}] @${profile.username}: qualified=${qualification.qualified}`);
 
@@ -315,6 +363,461 @@ async function processInstagramJob(
   }
 }
 
+/**
+ * Process an X/Twitter search job - this runs asynchronously
+ * Uses SerpAPI (Google search) to find X profiles with coaching keywords
+ */
+async function processXJob(
+  jobId: string,
+  keyword: string,
+  maxResults: number
+): Promise<void> {
+  try {
+    updateJobStatus(jobId, 'processing');
+
+    const profilesToFetch = Math.min(maxResults * 2, 100);
+
+    // Use SerpAPI/Google search to find X profiles
+    console.log(`[${jobId}] Using SERPAPI/Google search for X profiles: ${keyword}`);
+    const serpResults = await searchGoogleForCreators(keyword, 'x', profilesToFetch);
+    console.log(`[${jobId}] SerpAPI found ${serpResults.length} X profiles`);
+
+    // Deduplicate by username
+    const uniqueProfiles = new Map<string, typeof serpResults[0]>();
+    for (const result of serpResults) {
+      if (result.username && !uniqueProfiles.has(result.username.toLowerCase())) {
+        uniqueProfiles.set(result.username.toLowerCase(), result);
+      }
+    }
+
+    const profiles = Array.from(uniqueProfiles.values());
+    updateJobStatus(jobId, 'processing', 0, profiles.length);
+
+    console.log(`[${jobId}] Processing ${profiles.length} unique X profiles`);
+
+    // Process each profile
+    for (let i = 0; i < profiles.length; i++) {
+      const profile = profiles[i];
+
+      // Check if job was cancelled
+      const currentJob = getJob(jobId);
+      if (currentJob?.status === 'failed') {
+        console.log(`[${jobId}] Job was cancelled, stopping processing`);
+        return;
+      }
+
+      console.log(`[${jobId}] Processing X profile ${i + 1}/${profiles.length}: @${profile.username}`);
+
+      try {
+        // Convert to XProfile format for qualification
+        const xProfile = convertSerpResultToXProfile(profile);
+
+        // AI Qualification
+        const qualification = await qualifyXCreator(xProfile, keyword);
+
+        console.log(`[${jobId}] @${profile.username}: qualified=${qualification.qualified}`);
+
+        // Try to extract email from snippet (Google often includes bio text)
+        let email: string | null = null;
+        if (qualification.qualified) {
+          email = extractEmailFromBio(profile.snippet);
+          if (email) {
+            console.log(`[${jobId}] Found email for @${profile.username}: ${email}`);
+          }
+        }
+
+        // Extract first name from title
+        const firstName = profile.title ? profile.title.split(/[\s(|@]/)[0] : null;
+
+        // Save to database
+        addCreator({
+          job_id: jobId,
+          platform: 'x',
+          platform_id: profile.username,
+          username: profile.username,
+          display_name: xProfile.displayName,
+          profile_url: profile.url,
+          followers: 0, // X API is restricted, we don't have this
+          following: 0,
+          post_count: 0,
+          total_views: 0,
+          engagement_rate: 0,
+          bio: profile.snippet,
+          external_url: null,
+          qualified: qualification.qualified,
+          qualification_reason: qualification.reason,
+          email: email,
+          first_name: firstName,
+        });
+
+        updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+
+        // Small delay to avoid rate limiting
+        await sleep(300);
+      } catch (error) {
+        console.error(`[${jobId}] Error processing X profile @${profile.username}:`, error);
+        updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+      }
+    }
+
+    // Mark job as complete
+    updateJobStatus(jobId, 'completed', profiles.length, profiles.length);
+    console.log(`[${jobId}] X job completed successfully`);
+  } catch (error) {
+    console.error(`[${jobId}] X job failed:`, error);
+    updateJobStatus(
+      jobId,
+      'failed',
+      undefined,
+      undefined,
+      error instanceof Error ? error.message : 'Unknown error'
+    );
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Continue an existing search job - finds more creators for the same keyword
+ * Skips already-processed creators and uses different query variations
+ */
+export function continueSearchJob(
+  jobId: string,
+  keyword: string,
+  maxResults: number,
+  platform: Platform
+): void {
+  console.log(`[${jobId}] Continuing search for "${keyword}" on ${platform}`);
+
+  // Get existing creators count to calculate query offset
+  const existingCreators = getCreatorsByJobId(jobId);
+  const queryOffset = Math.floor(existingCreators.length / 10) * 5; // Rough estimate: skip 5 queries per 10 results
+
+  if (platform === 'instagram') {
+    console.log(`[${jobId}] Continuing Instagram search with offset ${queryOffset}`);
+    continueInstagramJob(jobId, keyword, maxResults, queryOffset).catch((error) => {
+      console.error(`Continue Instagram Job ${jobId} failed:`, error);
+      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+    });
+  } else if (platform === 'x') {
+    console.log(`[${jobId}] Continuing X search with offset ${queryOffset}`);
+    continueXJob(jobId, keyword, maxResults, queryOffset).catch((error) => {
+      console.error(`Continue X Job ${jobId} failed:`, error);
+      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+    });
+  } else {
+    // YouTube continuation - search with different keywords
+    console.log(`[${jobId}] Continuing YouTube search`);
+    continueYouTubeJob(jobId, keyword, maxResults).catch((error) => {
+      console.error(`Continue YouTube Job ${jobId} failed:`, error);
+      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+    });
+  }
+}
+
+/**
+ * Continue Instagram search with query offset
+ */
+async function continueInstagramJob(
+  jobId: string,
+  keyword: string,
+  maxResults: number,
+  queryOffset: number
+): Promise<void> {
+  try {
+    updateJobStatus(jobId, 'processing');
+
+    // Get existing usernames to exclude
+    const existingIdentifiers = getExistingIdentifiers(jobId);
+    console.log(`[${jobId}] Excluding ${existingIdentifiers.size} existing creators`);
+
+    const profilesToFetch = Math.min(maxResults * 2, 100);
+
+    // Use SerpAPI with query offset to get different results
+    console.log(`[${jobId}] Using SERPAPI with offset ${queryOffset} for more Instagram profiles`);
+    const serpResults = await searchGoogleForCreators(keyword, 'instagram', profilesToFetch, queryOffset, existingIdentifiers);
+    console.log(`[${jobId}] SerpAPI found ${serpResults.length} new Instagram profiles`);
+
+    if (serpResults.length === 0) {
+      console.log(`[${jobId}] No new profiles found, completing job`);
+      updateJobStatus(jobId, 'completed');
+      return;
+    }
+
+    // Extract usernames, filtering out existing ones
+    const usernames = serpResults
+      .map(r => r.username)
+      .filter(u => !existingIdentifiers.has(u.toLowerCase()));
+
+    console.log(`[${jobId}] ${usernames.length} new unique usernames to process`);
+
+    if (usernames.length === 0) {
+      updateJobStatus(jobId, 'completed');
+      return;
+    }
+
+    // Get full profile details via Apify
+    const fetchedProfiles = await getInstagramProfiles(usernames);
+    console.log(`[${jobId}] Retrieved ${fetchedProfiles.length} full profiles`);
+
+    // Convert profiles to search results format
+    const profiles = fetchedProfiles.map(profile => ({
+      username: profile.username,
+      userId: profile.id,
+      fullName: profile.fullName,
+      biography: profile.biography,
+      externalUrl: profile.externalUrl,
+      followersCount: profile.followersCount,
+      followsCount: profile.followsCount,
+      postsCount: profile.postsCount,
+      isVerified: profile.isVerified,
+      isBusinessAccount: profile.isBusinessAccount,
+      businessCategoryName: profile.businessCategoryName,
+      profilePicUrl: profile.profilePicUrl,
+      engagementRate: 0,
+      recentPosts: [] as { caption: string; likesCount: number; commentsCount: number; timestamp: string }[],
+    }));
+
+    // Process each profile (same logic as original)
+    for (let i = 0; i < profiles.length; i++) {
+      const profile = profiles[i];
+
+      const currentJob = getJob(jobId);
+      if (currentJob?.status === 'failed') {
+        console.log(`[${jobId}] Job was cancelled, stopping`);
+        return;
+      }
+
+      console.log(`[${jobId}] Processing Instagram profile ${i + 1}/${profiles.length}: @${profile.username}`);
+
+      try {
+        if (profile.followersCount < MIN_FOLLOWERS || profile.postsCount < MIN_POSTS) {
+          continue;
+        }
+
+        const qualification = await qualifyInstagramCreator(profile, keyword);
+        console.log(`[${jobId}] @${profile.username}: qualified=${qualification.qualified}`);
+
+        let email: string | null = null;
+        if (qualification.qualified) {
+          email = extractEmailFromBio(profile.biography || '');
+        }
+
+        const firstName = profile.fullName ? profile.fullName.split(' ')[0] : null;
+
+        addCreator({
+          job_id: jobId,
+          platform: 'instagram',
+          platform_id: profile.userId,
+          username: profile.username,
+          display_name: profile.fullName || profile.username,
+          profile_url: `https://instagram.com/${profile.username}`,
+          followers: profile.followersCount,
+          following: profile.followsCount,
+          post_count: profile.postsCount,
+          total_views: 0,
+          engagement_rate: profile.engagementRate,
+          bio: profile.biography || null,
+          external_url: profile.externalUrl || null,
+          qualified: qualification.qualified,
+          qualification_reason: qualification.reason,
+          email: email,
+          first_name: firstName,
+        });
+
+        await sleep(500);
+      } catch (error) {
+        console.error(`[${jobId}] Error processing @${profile.username}:`, error);
+      }
+    }
+
+    updateJobStatus(jobId, 'completed');
+    console.log(`[${jobId}] Instagram continuation completed`);
+  } catch (error) {
+    console.error(`[${jobId}] Instagram continuation failed:`, error);
+    updateJobStatus(jobId, 'failed', undefined, undefined, error instanceof Error ? error.message : 'Unknown error');
+  }
+}
+
+/**
+ * Continue X search with query offset
+ */
+async function continueXJob(
+  jobId: string,
+  keyword: string,
+  maxResults: number,
+  queryOffset: number
+): Promise<void> {
+  try {
+    updateJobStatus(jobId, 'processing');
+
+    const existingIdentifiers = getExistingIdentifiers(jobId);
+    console.log(`[${jobId}] Excluding ${existingIdentifiers.size} existing X profiles`);
+
+    const profilesToFetch = Math.min(maxResults * 2, 100);
+
+    const serpResults = await searchGoogleForCreators(keyword, 'x', profilesToFetch, queryOffset, existingIdentifiers);
+    console.log(`[${jobId}] SerpAPI found ${serpResults.length} new X profiles`);
+
+    if (serpResults.length === 0) {
+      updateJobStatus(jobId, 'completed');
+      return;
+    }
+
+    // Filter out existing usernames
+    const newProfiles = serpResults.filter(r => !existingIdentifiers.has(r.username.toLowerCase()));
+    console.log(`[${jobId}] ${newProfiles.length} new unique X profiles to process`);
+
+    for (let i = 0; i < newProfiles.length; i++) {
+      const profile = newProfiles[i];
+
+      const currentJob = getJob(jobId);
+      if (currentJob?.status === 'failed') {
+        return;
+      }
+
+      console.log(`[${jobId}] Processing X profile ${i + 1}/${newProfiles.length}: @${profile.username}`);
+
+      try {
+        const xProfile = convertSerpResultToXProfile(profile);
+        const qualification = await qualifyXCreator(xProfile, keyword);
+        console.log(`[${jobId}] @${profile.username}: qualified=${qualification.qualified}`);
+
+        let email: string | null = null;
+        if (qualification.qualified) {
+          email = extractEmailFromBio(profile.snippet);
+        }
+
+        const firstName = profile.title ? profile.title.split(/[\s(|@]/)[0] : null;
+
+        addCreator({
+          job_id: jobId,
+          platform: 'x',
+          platform_id: profile.username,
+          username: profile.username,
+          display_name: xProfile.displayName,
+          profile_url: profile.url,
+          followers: 0,
+          following: 0,
+          post_count: 0,
+          total_views: 0,
+          engagement_rate: 0,
+          bio: profile.snippet,
+          external_url: null,
+          qualified: qualification.qualified,
+          qualification_reason: qualification.reason,
+          email: email,
+          first_name: firstName,
+        });
+
+        await sleep(300);
+      } catch (error) {
+        console.error(`[${jobId}] Error processing @${profile.username}:`, error);
+      }
+    }
+
+    updateJobStatus(jobId, 'completed');
+    console.log(`[${jobId}] X continuation completed`);
+  } catch (error) {
+    console.error(`[${jobId}] X continuation failed:`, error);
+    updateJobStatus(jobId, 'failed', undefined, undefined, error instanceof Error ? error.message : 'Unknown error');
+  }
+}
+
+/**
+ * Continue YouTube search - uses modified keywords to find different channels
+ */
+async function continueYouTubeJob(
+  jobId: string,
+  keyword: string,
+  maxResults: number
+): Promise<void> {
+  try {
+    updateJobStatus(jobId, 'processing');
+
+    const existingIdentifiers = getExistingIdentifiers(jobId);
+    console.log(`[${jobId}] Excluding ${existingIdentifiers.size} existing YouTube channels`);
+
+    // Add variations to keyword to get different results
+    const variations = [
+      `${keyword} tutorial`,
+      `${keyword} tips`,
+      `${keyword} course`,
+      `${keyword} how to`,
+      `${keyword} beginners`,
+    ];
+    const variation = variations[Math.floor(Math.random() * variations.length)];
+
+    console.log(`[${jobId}] Searching YouTube with variation: "${variation}"`);
+    const searchResults = await searchYouTubeChannels(variation, maxResults);
+    console.log(`[${jobId}] Found ${searchResults.length} channels`);
+
+    // Filter out existing channels
+    const newChannels = searchResults.filter(c => !existingIdentifiers.has(c.channelId.toLowerCase()));
+    console.log(`[${jobId}] ${newChannels.length} new channels to process`);
+
+    for (let i = 0; i < newChannels.length; i++) {
+      const channel = newChannels[i];
+
+      const currentJob = getJob(jobId);
+      if (currentJob?.status === 'failed') {
+        return;
+      }
+
+      console.log(`[${jobId}] Processing channel ${i + 1}/${newChannels.length}: ${channel.channelName}`);
+
+      try {
+        if (channel.numberOfSubscribers < MIN_SUBSCRIBERS) continue;
+
+        const channelDetails = await getChannelDetails(channel.channelId);
+        if (!channelDetails || channelDetails.videoCount < MIN_VIDEOS) continue;
+
+        const videos = await getRecentVideos(channelDetails.uploadsPlaylistId, 10);
+        const qualification = await qualifyCreator(channelDetails, videos, channel.descriptionLinks);
+
+        console.log(`[${jobId}] ${channel.channelName}: qualified=${qualification.qualified}`);
+
+        let email: string | null = null;
+        if (qualification.qualified) {
+          const channelUrl = `${channel.channelUrl}/videos`;
+          const emailResult = await scrapeChannelEmail(channelUrl);
+          if (emailResult.email.length > 0) {
+            email = emailResult.email[0];
+          }
+        }
+
+        addCreator({
+          job_id: jobId,
+          platform: 'youtube',
+          platform_id: channel.channelId,
+          username: null,
+          display_name: channel.channelName,
+          profile_url: channel.channelUrl,
+          followers: channelDetails.subscriberCount,
+          following: 0,
+          post_count: channelDetails.videoCount,
+          total_views: channelDetails.viewCount,
+          engagement_rate: 0,
+          bio: channelDetails.description || null,
+          external_url: null,
+          qualified: qualification.qualified,
+          qualification_reason: qualification.reason,
+          email: email,
+          first_name: null,
+        });
+
+        await sleep(500);
+      } catch (error) {
+        console.error(`[${jobId}] Error processing ${channel.channelName}:`, error);
+      }
+    }
+
+    updateJobStatus(jobId, 'completed');
+    console.log(`[${jobId}] YouTube continuation completed`);
+  } catch (error) {
+    console.error(`[${jobId}] YouTube continuation failed:`, error);
+    updateJobStatus(jobId, 'failed', undefined, undefined, error instanceof Error ? error.message : 'Unknown error');
+  }
 }

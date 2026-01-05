@@ -6,7 +6,7 @@ import JobStatus from '@/components/JobStatus';
 import ResultsTable from '@/components/ResultsTable';
 import { Niche } from '@/lib/niches';
 
-type Platform = 'youtube' | 'instagram' | 'tiktok' | 'linkedin' | 'skool' | 'substack';
+type Platform = 'youtube' | 'instagram' | 'x' | 'tiktok' | 'linkedin' | 'skool' | 'substack';
 
 interface Creator {
   id: number;
@@ -53,10 +53,7 @@ interface Summary {
 const PLATFORMS: { id: Platform; name: string; icon: string; available: boolean }[] = [
   { id: 'youtube', name: 'YouTube', icon: '📺', available: true },
   { id: 'instagram', name: 'Instagram', icon: '📸', available: true },
-  { id: 'tiktok', name: 'TikTok', icon: '🎵', available: false },
-  { id: 'linkedin', name: 'LinkedIn', icon: '💼', available: false },
-  { id: 'skool', name: 'Skool', icon: '🎓', available: false },
-  { id: 'substack', name: 'Substack', icon: '📝', available: false },
+  { id: 'x', name: 'X', icon: '𝕏', available: true },
 ];
 
 export default function Home() {
@@ -65,10 +62,12 @@ export default function Home() {
   const [creators, setCreators] = useState<Creator[]>([]);
   const [summary, setSummary] = useState<Summary>({ total: 0, qualified: 0, withEmail: 0 });
   const [isSearching, setIsSearching] = useState(false);
+  const [isFindingMore, setIsFindingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedNiche, setSelectedNiche] = useState<Niche | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('youtube');
   const [maxResults, setMaxResults] = useState(50);
+  const [seedAccounts, setSeedAccounts] = useState('');
 
   const pollJob = useCallback(async (id: string) => {
     try {
@@ -107,10 +106,21 @@ export default function Home() {
     const keyword = niche.searchKeywords[0];
 
     try {
+      const requestBody: { keyword: string; maxResults: number; platform: Platform; seedAccounts?: string } = {
+        keyword,
+        maxResults,
+        platform: selectedPlatform,
+      };
+
+      // Include seed accounts for Instagram if provided
+      if (selectedPlatform === 'instagram' && seedAccounts.trim()) {
+        requestBody.seedAccounts = seedAccounts.trim();
+      }
+
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword, maxResults, platform: selectedPlatform }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -129,6 +139,45 @@ export default function Home() {
     }
   };
 
+  // Handle search with just seed accounts (no niche selection needed)
+  const handleSeedSearch = async () => {
+    if (!seedAccounts.trim()) return;
+
+    setIsSearching(true);
+    setError(null);
+    setJob(null);
+    setCreators([]);
+    setSummary({ total: 0, qualified: 0, withEmail: 0 });
+    setSelectedNiche(null);
+
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword: 'similar creators', // Generic keyword since we're using seeds
+          maxResults,
+          platform: 'instagram',
+          seedAccounts: seedAccounts.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start search');
+      }
+
+      const data = await response.json();
+      setJobId(data.jobId);
+
+      // Start polling for results
+      pollJob(data.jobId);
+    } catch (err) {
+      console.error('Error starting seed search:', err);
+      setError('Failed to start search. Please try again.');
+      setIsSearching(false);
+    }
+  };
+
   const handleNewSearch = () => {
     setJobId(null);
     setJob(null);
@@ -136,6 +185,35 @@ export default function Home() {
     setSummary({ total: 0, qualified: 0, withEmail: 0 });
     setError(null);
     setSelectedNiche(null);
+  };
+
+  // Handle "Find More" - continue searching with the same job
+  const handleFindMore = async () => {
+    if (!jobId || !job) return;
+
+    setIsFindingMore(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/search/${jobId}/continue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maxResults }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to continue search');
+      }
+
+      // Start polling for results again
+      setIsSearching(true);
+      pollJob(jobId);
+    } catch (err) {
+      console.error('Error continuing search:', err);
+      setError('Failed to find more creators. Please try again.');
+    } finally {
+      setIsFindingMore(false);
+    }
   };
 
   return (
@@ -287,6 +365,62 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Seed Accounts Input - Instagram Only */}
+              {selectedPlatform === 'instagram' && (
+                <div className="max-w-lg mx-auto">
+                  <div className="bg-[var(--bg-surface)] border border-[var(--signal-action)] rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-[var(--signal-action-dim)] flex items-center justify-center">
+                        <svg className="w-4 h-4 text-[var(--signal-action)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-[var(--text-primary)]">
+                          Seed Accounts (Recommended)
+                        </label>
+                        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                          Find creators similar to accounts you already know
+                        </p>
+                      </div>
+                    </div>
+
+                    <textarea
+                      value={seedAccounts}
+                      onChange={(e) => setSeedAccounts(e.target.value)}
+                      placeholder="Enter Instagram usernames (one per line or comma-separated)&#10;&#10;Example:&#10;@dropshippingcoach&#10;@ecommentor&#10;@shopifyexpert"
+                      className="w-full h-28 px-4 py-3 rounded-lg bg-[var(--bg-deep)] border border-[var(--bg-border)] text-[var(--text-primary)] placeholder-[var(--text-muted)] text-sm font-mono focus:border-[var(--signal-action)] focus:ring-1 focus:ring-[var(--signal-action)] focus:outline-none resize-none"
+                      disabled={isSearching}
+                    />
+
+                    {/* Start Search Button - shows when seeds are entered */}
+                    {seedAccounts.trim().length > 0 && (
+                      <button
+                        onClick={handleSeedSearch}
+                        disabled={isSearching}
+                        className="w-full mt-4 py-3 px-4 rounded-lg bg-[var(--signal-action)] text-white font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        {isSearching ? 'Searching...' : 'Find Similar Creators'}
+                      </button>
+                    )}
+
+                    <div className="mt-3 pt-3 border-t border-[var(--bg-border)]">
+                      <div className="flex items-start gap-2 text-xs text-[var(--text-muted)]">
+                        <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-[var(--signal-action)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        <span>
+                          <strong className="text-[var(--text-secondary)]">Pro tip:</strong> Enter 2-5 accounts of known coaches in your niche. The algorithm will find similar creators who Instagram recommends alongside them.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Niche Picker */}
               <div className="max-w-5xl mx-auto">
                 <div className="text-center mb-6">
@@ -336,6 +470,9 @@ export default function Home() {
                   summary={summary}
                   jobId={jobId}
                   platform={selectedPlatform}
+                  onFindMore={handleFindMore}
+                  isFindingMore={isFindingMore}
+                  jobStatus={job.status}
                 />
               )}
 

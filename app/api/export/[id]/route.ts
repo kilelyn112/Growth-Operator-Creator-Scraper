@@ -18,27 +18,37 @@ export async function GET(
 
     const creators = getQualifiedCreatorsByJobId(id);
 
-    // Build CSV
+    // Build CSV with multi-platform support
     const headers = [
-      'Channel Name',
-      'Channel URL',
-      'Subscribers',
-      'Video Count',
+      'Platform',
+      'Username',
+      'Display Name',
+      'Profile URL',
+      'Followers',
+      'Post Count',
       'Total Views',
+      'Engagement Rate',
       'Email',
       'First Name',
+      'Bio',
+      'External URL',
       'Qualification Reason',
     ];
 
     const rows = creators.map((c) => [
-      escapeCsvField(c.channel_name),
-      escapeCsvField(c.channel_url),
-      c.subscribers.toString(),
-      c.video_count.toString(),
-      c.total_views.toString(),
+      escapeCsvField(c.platform || 'youtube'),
+      escapeCsvField(c.username || ''),
+      escapeCsvField(c.display_name || c.channel_name || ''),
+      escapeCsvField(c.profile_url || c.channel_url || ''),
+      (c.followers ?? c.subscribers ?? 0).toString(),
+      (c.post_count ?? c.video_count ?? 0).toString(),
+      (c.total_views ?? 0).toString(),
+      (c.engagement_rate ?? 0).toFixed(2),
       escapeCsvField(c.email || ''),
       escapeCsvField(c.first_name || ''),
-      escapeCsvField(c.qualification_reason),
+      escapeCsvField(c.bio || ''),
+      escapeCsvField(c.external_url || ''),
+      escapeCsvField(c.qualification_reason || ''),
     ]);
 
     const csv = [
