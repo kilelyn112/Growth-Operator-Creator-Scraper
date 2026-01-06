@@ -814,7 +814,17 @@ export default function Home() {
       <footer className="border-t border-[var(--bg-border)] mt-auto">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between text-xs font-mono text-[var(--text-muted)]">
-            <span>Creator Hunter v1.0</span>
+            <span>
+              Powered by{' '}
+              <a
+                href="https://growthoperator.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--signal-action)] hover:underline"
+              >
+                growthoperator.com
+              </a>
+            </span>
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--signal-success)]"></span>
