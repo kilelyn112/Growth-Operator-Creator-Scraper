@@ -4,7 +4,11 @@ import { useState, useCallback } from 'react';
 import NichePicker from '@/components/NichePicker';
 import JobStatus from '@/components/JobStatus';
 import ResultsTable from '@/components/ResultsTable';
+import FunnelResults from '@/components/FunnelResults';
 import { Niche } from '@/lib/niches';
+import { Funnel } from '@/lib/db';
+
+type AppMode = 'creator-hunter' | 'funnel-finder';
 
 type Platform = 'youtube' | 'instagram' | 'x' | 'tiktok' | 'linkedin' | 'skool' | 'substack';
 
@@ -50,6 +54,24 @@ interface Summary {
   withEmail: number;
 }
 
+interface FunnelJob {
+  id: string;
+  niche: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  total: number;
+  error?: string;
+}
+
+interface FunnelSummary {
+  total: number;
+  withEmail: number;
+  clickfunnels: number;
+  gohighlevel: number;
+  other: number;
+  avgQuality: number;
+}
+
 const PLATFORMS: { id: Platform; name: string; icon: string; available: boolean }[] = [
   { id: 'youtube', name: 'YouTube', icon: '📺', available: true },
   { id: 'instagram', name: 'Instagram', icon: '📸', available: true },
@@ -57,6 +79,10 @@ const PLATFORMS: { id: Platform; name: string; icon: string; available: boolean 
 ];
 
 export default function Home() {
+  // App mode state
+  const [appMode, setAppMode] = useState<AppMode>('creator-hunter');
+
+  // Creator Hunter state
   const [jobId, setJobId] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [creators, setCreators] = useState<Creator[]>([]);
@@ -68,6 +94,17 @@ export default function Home() {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('youtube');
   const [maxResults, setMaxResults] = useState(50);
   const [seedAccounts, setSeedAccounts] = useState('');
+
+  // Funnel Finder state
+  const [funnelJobId, setFunnelJobId] = useState<string | null>(null);
+  const [funnelJob, setFunnelJob] = useState<FunnelJob | null>(null);
+  const [funnels, setFunnels] = useState<Funnel[]>([]);
+  const [funnelSummary, setFunnelSummary] = useState<FunnelSummary>({
+    total: 0, withEmail: 0, clickfunnels: 0, gohighlevel: 0, other: 0, avgQuality: 0
+  });
+  const [funnelNiche, setFunnelNiche] = useState('');
+  const [isFunnelSearching, setIsFunnelSearching] = useState(false);
+  const [funnelError, setFunnelError] = useState<string | null>(null);
 
   const pollJob = useCallback(async (id: string) => {
     try {
@@ -216,6 +253,74 @@ export default function Home() {
     }
   };
 
+  // ===== FUNNEL FINDER FUNCTIONS =====
+
+  const pollFunnelJob = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/funnel/search/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch funnel job status');
+      }
+
+      const data = await response.json();
+      setFunnelJob(data.job);
+      setFunnels(data.funnels);
+      setFunnelSummary(data.summary);
+
+      if (data.job.status === 'pending' || data.job.status === 'processing') {
+        setTimeout(() => pollFunnelJob(id), 2000);
+      } else {
+        setIsFunnelSearching(false);
+      }
+    } catch (err) {
+      console.error('Error polling funnel job:', err);
+      setFunnelError('Failed to fetch job status');
+      setIsFunnelSearching(false);
+    }
+  }, []);
+
+  const handleFunnelSearch = async () => {
+    if (!funnelNiche.trim()) return;
+
+    setIsFunnelSearching(true);
+    setFunnelError(null);
+    setFunnelJob(null);
+    setFunnels([]);
+    setFunnelSummary({ total: 0, withEmail: 0, clickfunnels: 0, gohighlevel: 0, other: 0, avgQuality: 0 });
+
+    try {
+      const response = await fetch('/api/funnel/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          niche: funnelNiche.trim(),
+          maxResults: 50,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start funnel search');
+      }
+
+      const data = await response.json();
+      setFunnelJobId(data.jobId);
+      pollFunnelJob(data.jobId);
+    } catch (err) {
+      console.error('Error starting funnel search:', err);
+      setFunnelError('Failed to start search. Please try again.');
+      setIsFunnelSearching(false);
+    }
+  };
+
+  const handleNewFunnelSearch = () => {
+    setFunnelJobId(null);
+    setFunnelJob(null);
+    setFunnels([]);
+    setFunnelSummary({ total: 0, withEmail: 0, clickfunnels: 0, gohighlevel: 0, other: 0, avgQuality: 0 });
+    setFunnelError(null);
+    setFunnelNiche('');
+  };
+
   return (
     <div className="min-h-screen bg-[var(--bg-deep)]">
       {/* Header */}
@@ -231,17 +336,41 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">
-                  Creator Hunter
+                  {appMode === 'creator-hunter' ? 'Creator Hunter' : 'Funnel Finder'}
                 </h1>
                 <p className="text-xs font-mono text-[var(--text-muted)] tracking-wider uppercase">
-                  Find qualified creators for outreach
+                  {appMode === 'creator-hunter' ? 'Find qualified creators for outreach' : 'Find ClickFunnels & GoHighLevel pages'}
                 </p>
               </div>
             </div>
 
+            {/* Mode Toggle */}
+            <div className="flex items-center gap-2 p-1 bg-[var(--bg-surface)] rounded-lg border border-[var(--bg-border)]">
+              <button
+                onClick={() => setAppMode('creator-hunter')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  appMode === 'creator-hunter'
+                    ? 'bg-[var(--signal-action)] text-black'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Creator Hunter
+              </button>
+              <button
+                onClick={() => setAppMode('funnel-finder')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  appMode === 'funnel-finder'
+                    ? 'bg-[var(--signal-action)] text-black'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Funnel Finder
+              </button>
+            </div>
+
             {/* Actions */}
             <div className="flex items-center gap-4">
-              {job && (
+              {appMode === 'creator-hunter' && job && (
                 <button
                   onClick={handleNewSearch}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--bg-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all duration-150 text-sm font-medium"
@@ -253,11 +382,29 @@ export default function Home() {
                 </button>
               )}
 
+              {appMode === 'funnel-finder' && funnelJob && (
+                <button
+                  onClick={handleNewFunnelSearch}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--bg-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all duration-150 text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  New Search
+                </button>
+              )}
+
               {/* Status Indicator */}
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--bg-border)]">
-                <div className={`w-2 h-2 rounded-full ${isSearching ? 'bg-[var(--signal-warning)] animate-pulse' : 'bg-[var(--signal-success)]'}`}></div>
+                <div className={`w-2 h-2 rounded-full ${
+                  (appMode === 'creator-hunter' && isSearching) || (appMode === 'funnel-finder' && isFunnelSearching)
+                    ? 'bg-[var(--signal-warning)] animate-pulse'
+                    : 'bg-[var(--signal-success)]'
+                }`}></div>
                 <span className="text-xs font-mono text-[var(--text-muted)]">
-                  {isSearching ? 'HUNTING' : 'READY'}
+                  {(appMode === 'creator-hunter' && isSearching) || (appMode === 'funnel-finder' && isFunnelSearching)
+                    ? 'SCANNING'
+                    : 'READY'}
                 </span>
               </div>
             </div>
@@ -268,6 +415,158 @@ export default function Home() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="space-y-8">
+
+          {/* ===== FUNNEL FINDER MODE ===== */}
+          {appMode === 'funnel-finder' && (
+            <>
+              {/* Funnel Error Alert */}
+              {funnelError && (
+                <div className="flex items-center gap-3 px-5 py-4 rounded-xl bg-[var(--signal-danger-dim)] border border-[rgba(239,68,68,0.3)]">
+                  <svg className="w-5 h-5 text-[var(--signal-danger)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-[var(--signal-danger)] font-medium">{funnelError}</span>
+                </div>
+              )}
+
+              {/* Funnel Search Input - Show when no active job */}
+              {!funnelJob && (
+                <div className="max-w-2xl mx-auto space-y-8">
+                  <div className="text-center">
+                    <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">
+                      Find ClickFunnels & GoHighLevel Pages
+                    </h2>
+                    <p className="text-[var(--text-secondary)]">
+                      Enter a niche to discover funnel pages and their owners
+                    </p>
+                  </div>
+
+                  <div className="bg-[var(--bg-surface)] border border-[var(--bg-border)] rounded-xl p-6">
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                      Target Niche
+                    </label>
+                    <input
+                      type="text"
+                      value={funnelNiche}
+                      onChange={(e) => setFunnelNiche(e.target.value)}
+                      placeholder="e.g., fitness coach, real estate investor, trading mentor"
+                      className="w-full px-4 py-3 rounded-lg bg-[var(--bg-deep)] border border-[var(--bg-border)] text-[var(--text-primary)] placeholder-[var(--text-muted)] text-sm focus:border-[var(--signal-action)] focus:ring-1 focus:ring-[var(--signal-action)] focus:outline-none"
+                      disabled={isFunnelSearching}
+                      onKeyDown={(e) => e.key === 'Enter' && handleFunnelSearch()}
+                    />
+
+                    <button
+                      onClick={handleFunnelSearch}
+                      disabled={isFunnelSearching || !funnelNiche.trim()}
+                      className="w-full mt-4 py-3 px-4 rounded-lg bg-[var(--signal-action)] text-black font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                    >
+                      {isFunnelSearching ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                          Scanning...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          Find Funnels
+                        </>
+                      )}
+                    </button>
+
+                    <div className="mt-4 pt-4 border-t border-[var(--bg-border)] text-xs text-[var(--text-muted)]">
+                      <p className="mb-2">This will search for:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li className="flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                          ClickFunnels pages in your niche
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                          GoHighLevel pages in your niche
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--signal-success)]"></span>
+                          Owner contact info (email, phone, socials)
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--signal-warning)]"></span>
+                          Page quality scores and issues
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Funnel Job Results */}
+              {funnelJob && (
+                <div className="space-y-6">
+                  {/* Niche Badge */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-[var(--text-muted)]">Searching:</span>
+                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--signal-action-dim)] border border-[var(--signal-action)] text-[var(--signal-action)] font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-[var(--signal-action)] animate-pulse"></span>
+                      {funnelJob.niche}
+                    </span>
+                  </div>
+
+                  {/* Job Status */}
+                  <JobStatus
+                    status={funnelJob.status}
+                    progress={funnelJob.progress}
+                    total={funnelJob.total}
+                    keyword={funnelJob.niche}
+                    error={funnelJob.error}
+                  />
+
+                  {/* Results */}
+                  {funnels.length > 0 && funnelJobId && (
+                    <FunnelResults
+                      funnels={funnels}
+                      summary={funnelSummary}
+                      jobId={funnelJobId}
+                      jobStatus={funnelJob.status}
+                    />
+                  )}
+
+                  {/* Empty State for Processing */}
+                  {funnelJob.status === 'processing' && funnels.length === 0 && (
+                    <div className="text-center py-16">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-[var(--signal-action-dim)] mb-6">
+                        <div className="w-8 h-8 border-2 border-[var(--signal-action)] border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                      <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+                        Scanning for funnels...
+                      </h3>
+                      <p className="text-[var(--text-muted)] max-w-md mx-auto">
+                        Searching Google for ClickFunnels and GoHighLevel pages in <span className="text-[var(--signal-action)]">{funnelJob.niche}</span>
+                      </p>
+                      <div className="mt-6 flex items-center justify-center gap-6 text-xs font-mono text-[var(--text-muted)]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--signal-action)] animate-pulse"></div>
+                          Google search
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                          CF/GHL detection
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[var(--signal-success)]"></div>
+                          Owner extraction
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ===== CREATOR HUNTER MODE ===== */}
+          {appMode === 'creator-hunter' && (
+            <>
           {/* Error Alert */}
           {error && (
             <div className="flex items-center gap-3 px-5 py-4 rounded-xl bg-[var(--signal-danger-dim)] border border-[rgba(239,68,68,0.3)]">
@@ -505,6 +804,8 @@ export default function Home() {
                 </div>
               )}
             </div>
+          )}
+            </>
           )}
         </div>
       </main>
