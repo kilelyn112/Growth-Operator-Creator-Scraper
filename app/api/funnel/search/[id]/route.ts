@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id: jobId } = await params;
 
-    const job = getJob(jobId);
+    const job = await getJob(jobId);
 
     if (!job) {
       return NextResponse.json(
@@ -17,8 +17,8 @@ export async function GET(
       );
     }
 
-    const funnels = getFunnelsByJobId(jobId);
-    const funnelsWithEmail = getFunnelsWithEmailByJobId(jobId);
+    const funnels = await getFunnelsByJobId(jobId);
+    const funnelsWithEmail = await getFunnelsWithEmailByJobId(jobId);
 
     // Count by platform
     const clickfunnelsCount = funnels.filter(f => f.platform === 'clickfunnels').length;

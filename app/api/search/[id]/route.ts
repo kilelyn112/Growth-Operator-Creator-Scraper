@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const job = getJob(id);
+    const job = await getJob(id);
     if (!job) {
       return NextResponse.json(
         { error: 'Job not found' },
@@ -16,7 +16,7 @@ export async function GET(
       );
     }
 
-    const creators = getCreatorsByJobId(id);
+    const creators = await getCreatorsByJobId(id);
 
     return NextResponse.json({
       job: {
@@ -31,7 +31,6 @@ export async function GET(
       },
       creators: creators.map((c) => ({
         id: c.id,
-        // New multi-platform fields
         platform: c.platform,
         platformId: c.platform_id,
         username: c.username,
@@ -49,11 +48,11 @@ export async function GET(
         email: c.email,
         firstName: c.first_name,
         // Legacy YouTube fields for backward compatibility
-        channelId: c.platform_id || c.channel_id,
-        channelName: c.display_name || c.channel_name,
-        channelUrl: c.profile_url || c.channel_url,
-        subscribers: c.followers || c.subscribers,
-        videoCount: c.post_count || c.video_count,
+        channelId: c.platform_id,
+        channelName: c.display_name,
+        channelUrl: c.profile_url,
+        subscribers: c.followers,
+        videoCount: c.post_count,
       })),
       summary: {
         total: creators.length,

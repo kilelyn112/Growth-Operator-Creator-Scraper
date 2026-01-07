@@ -1,156 +1,14 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-
-const dbPath = path.join(process.cwd(), 'jobs.db');
-const db = new Database(dbPath);
+import { supabase } from './supabase';
 
 // Platform types
 export type Platform = 'youtube' | 'instagram' | 'x' | 'tiktok' | 'linkedin' | 'skool' | 'substack';
 export type FunnelPlatform = 'clickfunnels' | 'gohighlevel' | 'other';
 
-// Initialize tables with multi-platform support
-db.exec(`
-  CREATE TABLE IF NOT EXISTS jobs (
-    id TEXT PRIMARY KEY,
-    keyword TEXT NOT NULL,
-    platform TEXT DEFAULT 'youtube',
-    max_results INTEGER,
-    status TEXT DEFAULT 'pending',
-    progress INTEGER DEFAULT 0,
-    total INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    error TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS creators (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id TEXT NOT NULL,
-    platform TEXT DEFAULT 'youtube',
-    platform_id TEXT NOT NULL,
-    username TEXT,
-    display_name TEXT,
-    profile_url TEXT,
-    followers INTEGER DEFAULT 0,
-    following INTEGER DEFAULT 0,
-    post_count INTEGER DEFAULT 0,
-    total_views INTEGER DEFAULT 0,
-    engagement_rate REAL DEFAULT 0,
-    bio TEXT,
-    external_url TEXT,
-    qualified BOOLEAN,
-    qualification_reason TEXT,
-    email TEXT,
-    first_name TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (job_id) REFERENCES jobs(id)
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_creators_job_id ON creators(job_id);
-  CREATE INDEX IF NOT EXISTS idx_creators_platform ON creators(platform);
-
-  CREATE TABLE IF NOT EXISTS funnels (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id TEXT NOT NULL,
-    funnel_url TEXT NOT NULL,
-    domain TEXT,
-    platform TEXT DEFAULT 'other',
-    niche TEXT,
-
-    -- Quality Analysis
-    quality_score INTEGER DEFAULT 0,
-    issues TEXT,
-    has_mobile_viewport BOOLEAN DEFAULT 0,
-    has_clear_cta BOOLEAN DEFAULT 0,
-    has_testimonials BOOLEAN DEFAULT 0,
-    has_trust_badges BOOLEAN DEFAULT 0,
-    page_load_time INTEGER,
-
-    -- Owner Info
-    owner_name TEXT,
-    owner_email TEXT,
-    owner_phone TEXT,
-    owner_instagram TEXT,
-    owner_youtube TEXT,
-    owner_x TEXT,
-    owner_linkedin TEXT,
-    owner_website TEXT,
-
-    -- Source Info
-    discovery_source TEXT DEFAULT 'google',
-    search_query TEXT,
-
-    -- Metadata
-    page_title TEXT,
-    page_description TEXT,
-
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (job_id) REFERENCES jobs(id)
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_funnels_job_id ON funnels(job_id);
-  CREATE INDEX IF NOT EXISTS idx_funnels_platform ON funnels(platform);
-  CREATE INDEX IF NOT EXISTS idx_funnels_domain ON funnels(domain);
-`);
-
-// Migration: Add platform column to existing tables if they don't have it
-try {
-  db.exec(`ALTER TABLE jobs ADD COLUMN platform TEXT DEFAULT 'youtube'`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN platform TEXT DEFAULT 'youtube'`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN platform_id TEXT`);
-  db.exec(`UPDATE creators SET platform_id = channel_id WHERE platform_id IS NULL`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN username TEXT`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN display_name TEXT`);
-  db.exec(`UPDATE creators SET display_name = channel_name WHERE display_name IS NULL`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN profile_url TEXT`);
-  db.exec(`UPDATE creators SET profile_url = channel_url WHERE profile_url IS NULL`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN followers INTEGER DEFAULT 0`);
-  db.exec(`UPDATE creators SET followers = subscribers WHERE followers = 0 OR followers IS NULL`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN following INTEGER DEFAULT 0`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN post_count INTEGER DEFAULT 0`);
-  db.exec(`UPDATE creators SET post_count = video_count WHERE post_count = 0 OR post_count IS NULL`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN engagement_rate REAL DEFAULT 0`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN bio TEXT`);
-} catch { /* Column already exists */ }
-
-try {
-  db.exec(`ALTER TABLE creators ADD COLUMN external_url TEXT`);
-} catch { /* Column already exists */ }
-
 export interface Job {
   id: string;
   keyword: string;
   platform: Platform;
+  job_type: 'creator' | 'funnel';
   max_results: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
@@ -161,7 +19,6 @@ export interface Job {
 
 export interface Creator {
   id: number;
-  job_id: string;
   platform: Platform;
   platform_id: string;
   username: string | null;
@@ -178,61 +35,102 @@ export interface Creator {
   qualification_reason: string;
   email: string | null;
   first_name: string | null;
+  niche: string | null;
   created_at: string;
-  // Legacy fields for backward compatibility
-  channel_id?: string;
-  channel_name?: string;
-  channel_url?: string;
-  subscribers?: number;
-  video_count?: number;
+  updated_at: string;
+  // Legacy compatibility
+  job_id?: string;
 }
 
-// Job operations
-export function createJob(id: string, keyword: string, maxResults: number, platform: Platform = 'youtube'): Job {
-  const stmt = db.prepare(`
-    INSERT INTO jobs (id, keyword, platform, max_results, status)
-    VALUES (?, ?, ?, ?, 'pending')
-  `);
-  stmt.run(id, keyword, platform, maxResults);
-  return getJob(id)!;
+export interface Funnel {
+  id: number;
+  funnel_url: string;
+  domain: string | null;
+  platform: FunnelPlatform;
+  niche: string | null;
+  quality_score: number;
+  issues: string | null;
+  has_mobile_viewport: boolean;
+  has_clear_cta: boolean;
+  has_testimonials: boolean;
+  has_trust_badges: boolean;
+  page_load_time: number | null;
+  owner_name: string | null;
+  owner_email: string | null;
+  owner_phone: string | null;
+  owner_instagram: string | null;
+  owner_youtube: string | null;
+  owner_x: string | null;
+  owner_linkedin: string | null;
+  owner_website: string | null;
+  discovery_source: string;
+  search_query: string | null;
+  page_title: string | null;
+  page_description: string | null;
+  created_at: string;
+  updated_at: string;
+  // Legacy compatibility
+  job_id?: string;
 }
 
-export function getJob(id: string): Job | null {
-  const stmt = db.prepare('SELECT * FROM jobs WHERE id = ?');
-  return stmt.get(id) as Job | null;
+// ============ JOB OPERATIONS ============
+
+export async function createJob(id: string, keyword: string, maxResults: number, platform: Platform = 'youtube', jobType: 'creator' | 'funnel' = 'creator'): Promise<Job> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .insert({
+      id,
+      keyword,
+      platform,
+      job_type: jobType,
+      max_results: maxResults,
+      status: 'pending',
+      progress: 0,
+      total: 0
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create job: ${error.message}`);
+  return data as Job;
 }
 
-export function updateJobStatus(
+export async function getJob(id: string): Promise<Job | null> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Not found
+    throw new Error(`Failed to get job: ${error.message}`);
+  }
+  return data as Job;
+}
+
+export async function updateJobStatus(
   id: string,
   status: Job['status'],
   progress?: number,
   total?: number,
   error?: string
-): void {
-  let sql = 'UPDATE jobs SET status = ?';
-  const params: (string | number)[] = [status];
+): Promise<void> {
+  const updates: Record<string, unknown> = { status };
+  if (progress !== undefined) updates.progress = progress;
+  if (total !== undefined) updates.total = total;
+  if (error !== undefined) updates.error = error;
 
-  if (progress !== undefined) {
-    sql += ', progress = ?';
-    params.push(progress);
-  }
-  if (total !== undefined) {
-    sql += ', total = ?';
-    params.push(total);
-  }
-  if (error !== undefined) {
-    sql += ', error = ?';
-    params.push(error);
-  }
+  const { error: updateError } = await supabase
+    .from('jobs')
+    .update(updates)
+    .eq('id', id);
 
-  sql += ' WHERE id = ?';
-  params.push(id);
-
-  const stmt = db.prepare(sql);
-  stmt.run(...params);
+  if (updateError) throw new Error(`Failed to update job: ${updateError.message}`);
 }
 
-// Creator operations
+// ============ CREATOR OPERATIONS ============
+
 export interface AddCreatorInput {
   job_id: string;
   platform: Platform;
@@ -251,110 +149,173 @@ export interface AddCreatorInput {
   qualification_reason: string;
   email?: string | null;
   first_name?: string | null;
+  niche?: string | null;
 }
 
-export function addCreator(creator: AddCreatorInput): Creator {
-  const stmt = db.prepare(`
-    INSERT INTO creators (
-      job_id, platform, platform_id, username, display_name, profile_url,
-      followers, following, post_count, total_views, engagement_rate,
-      bio, external_url, qualified, qualification_reason, email, first_name
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+// Check if creator exists in database (FLYWHEEL: cross-job lookup)
+export async function findExistingCreator(platform: Platform, platformId: string): Promise<Creator | null> {
+  const { data, error } = await supabase
+    .from('creators')
+    .select('*')
+    .eq('platform', platform)
+    .eq('platform_id', platformId)
+    .single();
 
-  const result = stmt.run(
-    creator.job_id,
-    creator.platform,
-    creator.platform_id,
-    creator.username || null,
-    creator.display_name,
-    creator.profile_url,
-    creator.followers,
-    creator.following || 0,
-    creator.post_count,
-    creator.total_views || 0,
-    creator.engagement_rate || 0,
-    creator.bio || null,
-    creator.external_url || null,
-    creator.qualified ? 1 : 0,
-    creator.qualification_reason,
-    creator.email || null,
-    creator.first_name || null
-  );
-
-  return getCreatorById(result.lastInsertRowid as number)!;
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    return null; // Silently fail for lookups
+  }
+  return { ...data, qualified: Boolean(data.qualified) } as Creator;
 }
 
-export function getCreatorById(id: number): Creator | null {
-  const stmt = db.prepare('SELECT * FROM creators WHERE id = ?');
-  const row = stmt.get(id) as (Omit<Creator, 'qualified'> & { qualified: number }) | null;
-  if (!row) return null;
-  return { ...row, qualified: Boolean(row.qualified) };
+// Find creators by username (for platforms like Instagram/X)
+export async function findCreatorByUsername(platform: Platform, username: string): Promise<Creator | null> {
+  const { data, error } = await supabase
+    .from('creators')
+    .select('*')
+    .eq('platform', platform)
+    .ilike('username', username)
+    .single();
+
+  if (error) return null;
+  return { ...data, qualified: Boolean(data.qualified) } as Creator;
 }
 
-export function getCreatorsByJobId(jobId: string): Creator[] {
-  const stmt = db.prepare('SELECT * FROM creators WHERE job_id = ? ORDER BY qualified DESC, followers DESC');
-  const rows = stmt.all(jobId) as (Omit<Creator, 'qualified'> & { qualified: number })[];
-  return rows.map(row => ({ ...row, qualified: Boolean(row.qualified) }));
+// Add or update creator (FLYWHEEL: upsert based on platform+platform_id)
+export async function addCreator(creator: AddCreatorInput): Promise<Creator> {
+  // First check if creator exists
+  const existing = await findExistingCreator(creator.platform, creator.platform_id);
+
+  if (existing) {
+    // Update existing creator with new data if it's more complete
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+    // Only update fields if new value is better
+    if (creator.followers > existing.followers) updates.followers = creator.followers;
+    if (creator.post_count > existing.post_count) updates.post_count = creator.post_count;
+    if ((creator.total_views || 0) > existing.total_views) updates.total_views = creator.total_views;
+    if (creator.email && !existing.email) updates.email = creator.email;
+    if (creator.bio && !existing.bio) updates.bio = creator.bio;
+    if (creator.external_url && !existing.external_url) updates.external_url = creator.external_url;
+    if (creator.niche && !existing.niche) updates.niche = creator.niche;
+
+    if (Object.keys(updates).length > 1) {
+      await supabase.from('creators').update(updates).eq('id', existing.id);
+    }
+
+    // Link to current job
+    await linkCreatorToJob(creator.job_id, existing.id);
+
+    return { ...existing, ...updates, job_id: creator.job_id };
+  }
+
+  // Insert new creator
+  const { data, error } = await supabase
+    .from('creators')
+    .insert({
+      platform: creator.platform,
+      platform_id: creator.platform_id,
+      username: creator.username || null,
+      display_name: creator.display_name,
+      profile_url: creator.profile_url,
+      followers: creator.followers,
+      following: creator.following || 0,
+      post_count: creator.post_count,
+      total_views: creator.total_views || 0,
+      engagement_rate: creator.engagement_rate || 0,
+      bio: creator.bio || null,
+      external_url: creator.external_url || null,
+      qualified: creator.qualified,
+      qualification_reason: creator.qualification_reason,
+      email: creator.email || null,
+      first_name: creator.first_name || null,
+      niche: creator.niche || null
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to add creator: ${error.message}`);
+
+  // Link to job
+  await linkCreatorToJob(creator.job_id, data.id);
+
+  return { ...data, qualified: Boolean(data.qualified), job_id: creator.job_id } as Creator;
 }
 
-export function getQualifiedCreatorsByJobId(jobId: string): Creator[] {
-  const stmt = db.prepare('SELECT * FROM creators WHERE job_id = ? AND qualified = 1 ORDER BY followers DESC');
-  const rows = stmt.all(jobId) as (Omit<Creator, 'qualified'> & { qualified: number })[];
-  return rows.map(row => ({ ...row, qualified: Boolean(row.qualified) }));
+// Link creator to job via job_results table
+async function linkCreatorToJob(jobId: string, creatorId: number): Promise<void> {
+  await supabase
+    .from('job_results')
+    .upsert({ job_id: jobId, creator_id: creatorId }, { onConflict: 'job_id,creator_id', ignoreDuplicates: true });
 }
 
-// Get existing platform IDs and usernames for a job (for deduplication)
-export function getExistingIdentifiers(jobId: string): Set<string> {
-  const stmt = db.prepare('SELECT platform_id, username FROM creators WHERE job_id = ?');
-  const rows = stmt.all(jobId) as { platform_id: string; username: string | null }[];
+export async function getCreatorById(id: number): Promise<Creator | null> {
+  const { data, error } = await supabase
+    .from('creators')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) return null;
+  return { ...data, qualified: Boolean(data.qualified) } as Creator;
+}
+
+export async function getCreatorsByJobId(jobId: string): Promise<Creator[]> {
+  const { data, error } = await supabase
+    .from('job_results')
+    .select('creator_id, creators(*)')
+    .eq('job_id', jobId)
+    .not('creator_id', 'is', null);
+
+  if (error) return [];
+
+  return (data || [])
+    .filter(row => row.creators)
+    .map(row => {
+      const creator = row.creators as unknown as Record<string, unknown>;
+      return {
+        ...(creator as unknown as Creator),
+        qualified: Boolean(creator.qualified),
+        job_id: jobId
+      };
+    })
+    .sort((a, b) => {
+      if (a.qualified !== b.qualified) return a.qualified ? -1 : 1;
+      return b.followers - a.followers;
+    });
+}
+
+export async function getQualifiedCreatorsByJobId(jobId: string): Promise<Creator[]> {
+  const creators = await getCreatorsByJobId(jobId);
+  return creators.filter(c => c.qualified);
+}
+
+// Get existing identifiers for deduplication during scraping
+export async function getExistingIdentifiers(jobId: string): Promise<Set<string>> {
+  const creators = await getCreatorsByJobId(jobId);
   const identifiers = new Set<string>();
-  for (const row of rows) {
-    if (row.platform_id) identifiers.add(row.platform_id.toLowerCase());
-    if (row.username) identifiers.add(row.username.toLowerCase());
+  for (const c of creators) {
+    if (c.platform_id) identifiers.add(c.platform_id.toLowerCase());
+    if (c.username) identifiers.add(c.username.toLowerCase());
   }
   return identifiers;
 }
 
-// ============ FUNNEL OPERATIONS ============
+// FLYWHEEL: Check database for existing creators before scraping
+export async function findExistingCreatorsByNiche(platform: Platform, niche: string, limit: number = 100): Promise<Creator[]> {
+  const { data, error } = await supabase
+    .from('creators')
+    .select('*')
+    .eq('platform', platform)
+    .ilike('niche', `%${niche}%`)
+    .order('followers', { ascending: false })
+    .limit(limit);
 
-export interface Funnel {
-  id: number;
-  job_id: string;
-  funnel_url: string;
-  domain: string | null;
-  platform: FunnelPlatform;
-  niche: string | null;
-
-  // Quality Analysis
-  quality_score: number;
-  issues: string | null; // JSON array
-  has_mobile_viewport: boolean;
-  has_clear_cta: boolean;
-  has_testimonials: boolean;
-  has_trust_badges: boolean;
-  page_load_time: number | null;
-
-  // Owner Info
-  owner_name: string | null;
-  owner_email: string | null;
-  owner_phone: string | null;
-  owner_instagram: string | null;
-  owner_youtube: string | null;
-  owner_x: string | null;
-  owner_linkedin: string | null;
-  owner_website: string | null;
-
-  // Source Info
-  discovery_source: string;
-  search_query: string | null;
-
-  // Metadata
-  page_title: string | null;
-  page_description: string | null;
-
-  created_at: string;
+  if (error) return [];
+  return (data || []).map(c => ({ ...c, qualified: Boolean(c.qualified) })) as Creator[];
 }
+
+// ============ FUNNEL OPERATIONS ============
 
 export interface AddFunnelInput {
   job_id: string;
@@ -362,7 +323,6 @@ export interface AddFunnelInput {
   domain?: string | null;
   platform: FunnelPlatform;
   niche?: string | null;
-
   quality_score?: number;
   issues?: string[] | null;
   has_mobile_viewport?: boolean;
@@ -370,7 +330,6 @@ export interface AddFunnelInput {
   has_testimonials?: boolean;
   has_trust_badges?: boolean;
   page_load_time?: number | null;
-
   owner_name?: string | null;
   owner_email?: string | null;
   owner_phone?: string | null;
@@ -379,91 +338,152 @@ export interface AddFunnelInput {
   owner_x?: string | null;
   owner_linkedin?: string | null;
   owner_website?: string | null;
-
   discovery_source?: string;
   search_query?: string | null;
-
   page_title?: string | null;
   page_description?: string | null;
 }
 
-export function addFunnel(funnel: AddFunnelInput): Funnel {
-  const stmt = db.prepare(`
-    INSERT INTO funnels (
-      job_id, funnel_url, domain, platform, niche,
-      quality_score, issues, has_mobile_viewport, has_clear_cta,
-      has_testimonials, has_trust_badges, page_load_time,
-      owner_name, owner_email, owner_phone, owner_instagram,
-      owner_youtube, owner_x, owner_linkedin, owner_website,
-      discovery_source, search_query, page_title, page_description
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+// Check if funnel exists (FLYWHEEL)
+export async function findExistingFunnel(funnelUrl: string): Promise<Funnel | null> {
+  const { data, error } = await supabase
+    .from('funnels')
+    .select('*')
+    .eq('funnel_url', funnelUrl)
+    .single();
 
-  const result = stmt.run(
-    funnel.job_id,
-    funnel.funnel_url,
-    funnel.domain || null,
-    funnel.platform,
-    funnel.niche || null,
-    funnel.quality_score || 0,
-    funnel.issues ? JSON.stringify(funnel.issues) : null,
-    funnel.has_mobile_viewport ? 1 : 0,
-    funnel.has_clear_cta ? 1 : 0,
-    funnel.has_testimonials ? 1 : 0,
-    funnel.has_trust_badges ? 1 : 0,
-    funnel.page_load_time || null,
-    funnel.owner_name || null,
-    funnel.owner_email || null,
-    funnel.owner_phone || null,
-    funnel.owner_instagram || null,
-    funnel.owner_youtube || null,
-    funnel.owner_x || null,
-    funnel.owner_linkedin || null,
-    funnel.owner_website || null,
-    funnel.discovery_source || 'google',
-    funnel.search_query || null,
-    funnel.page_title || null,
-    funnel.page_description || null
-  );
-
-  return getFunnelById(result.lastInsertRowid as number)!;
+  if (error) return null;
+  return normalizeFunnelRow(data);
 }
 
-export function getFunnelById(id: number): Funnel | null {
-  const stmt = db.prepare('SELECT * FROM funnels WHERE id = ?');
-  const row = stmt.get(id) as Record<string, unknown> | null;
-  if (!row) return null;
-  return normalizeFunnelRow(row);
+export async function addFunnel(funnel: AddFunnelInput): Promise<Funnel> {
+  // Check if exists
+  const existing = await findExistingFunnel(funnel.funnel_url);
+
+  if (existing) {
+    // Update with new data
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+    if (funnel.owner_email && !existing.owner_email) updates.owner_email = funnel.owner_email;
+    if (funnel.owner_name && !existing.owner_name) updates.owner_name = funnel.owner_name;
+    if ((funnel.quality_score || 0) > existing.quality_score) updates.quality_score = funnel.quality_score;
+
+    if (Object.keys(updates).length > 1) {
+      await supabase.from('funnels').update(updates).eq('id', existing.id);
+    }
+
+    await linkFunnelToJob(funnel.job_id, existing.id);
+    return { ...existing, ...updates, job_id: funnel.job_id };
+  }
+
+  // Insert new funnel
+  const { data, error } = await supabase
+    .from('funnels')
+    .insert({
+      funnel_url: funnel.funnel_url,
+      domain: funnel.domain || null,
+      platform: funnel.platform,
+      niche: funnel.niche || null,
+      quality_score: funnel.quality_score || 0,
+      issues: funnel.issues || null,
+      has_mobile_viewport: funnel.has_mobile_viewport || false,
+      has_clear_cta: funnel.has_clear_cta || false,
+      has_testimonials: funnel.has_testimonials || false,
+      has_trust_badges: funnel.has_trust_badges || false,
+      page_load_time: funnel.page_load_time || null,
+      owner_name: funnel.owner_name || null,
+      owner_email: funnel.owner_email || null,
+      owner_phone: funnel.owner_phone || null,
+      owner_instagram: funnel.owner_instagram || null,
+      owner_youtube: funnel.owner_youtube || null,
+      owner_x: funnel.owner_x || null,
+      owner_linkedin: funnel.owner_linkedin || null,
+      owner_website: funnel.owner_website || null,
+      discovery_source: funnel.discovery_source || 'google',
+      search_query: funnel.search_query || null,
+      page_title: funnel.page_title || null,
+      page_description: funnel.page_description || null
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to add funnel: ${error.message}`);
+
+  await linkFunnelToJob(funnel.job_id, data.id);
+
+  return { ...normalizeFunnelRow(data), job_id: funnel.job_id };
 }
 
-export function getFunnelsByJobId(jobId: string): Funnel[] {
-  const stmt = db.prepare('SELECT * FROM funnels WHERE job_id = ? ORDER BY quality_score DESC, created_at DESC');
-  const rows = stmt.all(jobId) as Record<string, unknown>[];
-  return rows.map(normalizeFunnelRow);
+async function linkFunnelToJob(jobId: string, funnelId: number): Promise<void> {
+  await supabase
+    .from('job_results')
+    .upsert({ job_id: jobId, funnel_id: funnelId }, { onConflict: 'job_id,funnel_id', ignoreDuplicates: true });
 }
 
-export function getFunnelsWithEmailByJobId(jobId: string): Funnel[] {
-  const stmt = db.prepare('SELECT * FROM funnels WHERE job_id = ? AND owner_email IS NOT NULL ORDER BY quality_score DESC');
-  const rows = stmt.all(jobId) as Record<string, unknown>[];
-  return rows.map(normalizeFunnelRow);
+export async function getFunnelById(id: number): Promise<Funnel | null> {
+  const { data, error } = await supabase
+    .from('funnels')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) return null;
+  return normalizeFunnelRow(data);
 }
 
-export function getExistingFunnelDomains(jobId: string): Set<string> {
-  const stmt = db.prepare('SELECT domain FROM funnels WHERE job_id = ? AND domain IS NOT NULL');
-  const rows = stmt.all(jobId) as { domain: string }[];
-  return new Set(rows.map(r => r.domain.toLowerCase()));
+export async function getFunnelsByJobId(jobId: string): Promise<Funnel[]> {
+  const { data, error } = await supabase
+    .from('job_results')
+    .select('funnel_id, funnels(*)')
+    .eq('job_id', jobId)
+    .not('funnel_id', 'is', null);
+
+  if (error) return [];
+
+  return (data || [])
+    .filter(row => row.funnels)
+    .map(row => {
+      const funnel = row.funnels as unknown as Record<string, unknown>;
+      return {
+        ...normalizeFunnelRow(funnel),
+        job_id: jobId
+      };
+    })
+    .sort((a, b) => b.quality_score - a.quality_score);
+}
+
+export async function getFunnelsWithEmailByJobId(jobId: string): Promise<Funnel[]> {
+  const funnels = await getFunnelsByJobId(jobId);
+  return funnels.filter(f => f.owner_email);
+}
+
+export async function getExistingFunnelDomains(jobId: string): Promise<Set<string>> {
+  const funnels = await getFunnelsByJobId(jobId);
+  return new Set(funnels.filter(f => f.domain).map(f => f.domain!.toLowerCase()));
+}
+
+// FLYWHEEL: Find existing funnels by niche
+export async function findExistingFunnelsByNiche(niche: string, limit: number = 100): Promise<Funnel[]> {
+  const { data, error } = await supabase
+    .from('funnels')
+    .select('*')
+    .ilike('niche', `%${niche}%`)
+    .order('quality_score', { ascending: false })
+    .limit(limit);
+
+  if (error) return [];
+  return (data || []).map(normalizeFunnelRow);
 }
 
 function normalizeFunnelRow(row: Record<string, unknown>): Funnel {
   return {
     id: row.id as number,
-    job_id: row.job_id as string,
     funnel_url: row.funnel_url as string,
     domain: row.domain as string | null,
     platform: row.platform as FunnelPlatform,
     niche: row.niche as string | null,
     quality_score: row.quality_score as number,
-    issues: row.issues as string | null,
+    issues: row.issues ? JSON.stringify(row.issues) : null,
     has_mobile_viewport: Boolean(row.has_mobile_viewport),
     has_clear_cta: Boolean(row.has_clear_cta),
     has_testimonials: Boolean(row.has_testimonials),
@@ -482,7 +502,22 @@ function normalizeFunnelRow(row: Record<string, unknown>): Funnel {
     page_title: row.page_title as string | null,
     page_description: row.page_description as string | null,
     created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
   };
 }
 
-export default db;
+// ============ STATS ============
+
+export async function getDatabaseStats(): Promise<{ creators: number; funnels: number; jobs: number }> {
+  const [creatorsResult, funnelsResult, jobsResult] = await Promise.all([
+    supabase.from('creators').select('id', { count: 'exact', head: true }),
+    supabase.from('funnels').select('id', { count: 'exact', head: true }),
+    supabase.from('jobs').select('id', { count: 'exact', head: true })
+  ]);
+
+  return {
+    creators: creatorsResult.count || 0,
+    funnels: funnelsResult.count || 0,
+    jobs: jobsResult.count || 0
+  };
+}

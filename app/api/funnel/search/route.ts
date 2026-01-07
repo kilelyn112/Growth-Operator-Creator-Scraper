@@ -18,8 +18,8 @@ export async function POST(request: NextRequest) {
 
     // Create a job to track progress
     const jobId = uuidv4();
-    createJob(jobId, niche, maxResults, 'youtube'); // Reuse jobs table with platform as marker
-    updateJobStatus(jobId, 'processing', 0, maxResults);
+    await createJob(jobId, niche, maxResults, 'youtube', 'funnel');
+    await updateJobStatus(jobId, 'processing', 0, maxResults);
 
     // Start async processing
     processFunnelJob(jobId, niche, maxResults);
@@ -49,7 +49,7 @@ async function processFunnelJob(jobId: string, niche: string, maxResults: number
     console.log(`Found ${searchResults.length} potential funnel URLs`);
 
     // Track existing domains to avoid duplicates
-    const existingDomains = getExistingFunnelDomains(jobId);
+    const existingDomains = await getExistingFunnelDomains(jobId);
     let processed = 0;
     let added = 0;
 
@@ -63,27 +63,27 @@ async function processFunnelJob(jobId: string, niche: string, maxResults: number
 
         if (!scraped) {
           processed++;
-          updateJobStatus(jobId, 'processing', processed, searchResults.length);
+          await updateJobStatus(jobId, 'processing', processed, searchResults.length);
           continue;
         }
 
         // Skip if we've already seen this domain
         if (existingDomains.has(scraped.domain.toLowerCase())) {
           processed++;
-          updateJobStatus(jobId, 'processing', processed, searchResults.length);
+          await updateJobStatus(jobId, 'processing', processed, searchResults.length);
           continue;
         }
 
         // Only add if we detected CF/GHL or if it looks like a funnel
         if (scraped.detection.detected || scraped.qualityScore >= 40) {
           const funnelInput = toFunnelInput(scraped, jobId, niche, result.query);
-          addFunnel(funnelInput);
+          await addFunnel(funnelInput);
           existingDomains.add(scraped.domain.toLowerCase());
           added++;
         }
 
         processed++;
-        updateJobStatus(jobId, 'processing', added, maxResults);
+        await updateJobStatus(jobId, 'processing', added, maxResults);
 
         // Rate limiting
         await sleep(300);
@@ -93,11 +93,11 @@ async function processFunnelJob(jobId: string, niche: string, maxResults: number
       }
     }
 
-    updateJobStatus(jobId, 'completed', added, added);
+    await updateJobStatus(jobId, 'completed', added, added);
     console.log(`Funnel job ${jobId} completed. Found ${added} funnels.`);
   } catch (error) {
     console.error(`Funnel job ${jobId} failed:`, error);
-    updateJobStatus(jobId, 'failed', 0, 0, String(error));
+    await updateJobStatus(jobId, 'failed', 0, 0, String(error));
   }
 }
 

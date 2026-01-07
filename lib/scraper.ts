@@ -32,30 +32,32 @@ export function startSearchJob(input: SearchJobInput): string {
   const jobId = uuidv4();
   const platform = input.platform || 'youtube';
   console.log(`[${jobId}] Starting job with platform: "${platform}"`);
-  createJob(jobId, input.keyword, input.maxResults, platform);
 
   // Start processing in the background based on platform
-  if (platform === 'instagram') {
-    console.log(`[${jobId}] Routing to Instagram job processor`);
+  (async () => {
+    await createJob(jobId, input.keyword, input.maxResults, platform);
 
-    processInstagramJob(jobId, input.keyword, input.maxResults, input.seedAccounts).catch((error) => {
-      console.error(`Instagram Job ${jobId} failed:`, error);
-      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
-    });
-  } else if (platform === 'x') {
-    console.log(`[${jobId}] Routing to X job processor`);
-    processXJob(jobId, input.keyword, input.maxResults).catch((error) => {
-      console.error(`X Job ${jobId} failed:`, error);
-      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
-    });
-  } else {
-    // Default to YouTube
-    console.log(`[${jobId}] Routing to YouTube job processor (platform="${platform}")`);
-    processYouTubeJob(jobId, input.keyword, input.maxResults).catch((error) => {
-      console.error(`YouTube Job ${jobId} failed:`, error);
-      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
-    });
-  }
+    if (platform === 'instagram') {
+      console.log(`[${jobId}] Routing to Instagram job processor`);
+      processInstagramJob(jobId, input.keyword, input.maxResults, input.seedAccounts).catch(async (error) => {
+        console.error(`Instagram Job ${jobId} failed:`, error);
+        await updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+      });
+    } else if (platform === 'x') {
+      console.log(`[${jobId}] Routing to X job processor`);
+      processXJob(jobId, input.keyword, input.maxResults).catch(async (error) => {
+        console.error(`X Job ${jobId} failed:`, error);
+        await updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+      });
+    } else {
+      // Default to YouTube
+      console.log(`[${jobId}] Routing to YouTube job processor (platform="${platform}")`);
+      processYouTubeJob(jobId, input.keyword, input.maxResults).catch(async (error) => {
+        console.error(`YouTube Job ${jobId} failed:`, error);
+        await updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+      });
+    }
+  })();
 
   return jobId;
 }
@@ -69,7 +71,7 @@ async function processYouTubeJob(
   maxResults: number
 ): Promise<void> {
   try {
-    updateJobStatus(jobId, 'processing');
+    await updateJobStatus(jobId, 'processing');
 
     // Step 1: Search YouTube channels via Apify
     console.log(`[${jobId}] Searching YouTube for channels with keyword: ${keyword}`);
@@ -85,14 +87,14 @@ async function processYouTubeJob(
     }
 
     const channels = Array.from(uniqueChannels.values());
-    updateJobStatus(jobId, 'processing', 0, channels.length);
+    await updateJobStatus(jobId, 'processing', 0, channels.length);
 
     // Step 2: Process each channel
     for (let i = 0; i < channels.length; i++) {
       const channel = channels[i];
 
       // Check if job was cancelled or failed
-      const currentJob = getJob(jobId);
+      const currentJob = await getJob(jobId);
       if (currentJob?.status === 'failed') {
         console.log(`[${jobId}] Job was cancelled, stopping processing`);
         return;
@@ -104,7 +106,7 @@ async function processYouTubeJob(
         // Pre-filter by subscriber count from Apify data
         if (channel.numberOfSubscribers < MIN_SUBSCRIBERS) {
           console.log(`[${jobId}] Skipping ${channel.channelName} - only ${channel.numberOfSubscribers} subscribers`);
-          updateJobStatus(jobId, 'processing', i + 1, channels.length);
+          await updateJobStatus(jobId, 'processing', i + 1, channels.length);
           continue;
         }
 
@@ -112,14 +114,14 @@ async function processYouTubeJob(
         const channelDetails = await getChannelDetails(channel.channelId);
         if (!channelDetails) {
           console.log(`[${jobId}] Could not get details for ${channel.channelName}`);
-          updateJobStatus(jobId, 'processing', i + 1, channels.length);
+          await updateJobStatus(jobId, 'processing', i + 1, channels.length);
           continue;
         }
 
         // Filter by video count
         if (channelDetails.videoCount < MIN_VIDEOS) {
           console.log(`[${jobId}] Skipping ${channel.channelName} - only ${channelDetails.videoCount} videos`);
-          updateJobStatus(jobId, 'processing', i + 1, channels.length);
+          await updateJobStatus(jobId, 'processing', i + 1, channels.length);
           continue;
         }
 
@@ -147,7 +149,7 @@ async function processYouTubeJob(
         }
 
         // Save to database with new schema
-        addCreator({
+        await addCreator({
           job_id: jobId,
           platform: 'youtube',
           platform_id: channel.channelId,
@@ -167,23 +169,23 @@ async function processYouTubeJob(
           first_name: null,
         });
 
-        updateJobStatus(jobId, 'processing', i + 1, channels.length);
+        await updateJobStatus(jobId, 'processing', i + 1, channels.length);
 
         // Small delay to avoid rate limiting
         await sleep(500);
       } catch (error) {
         console.error(`[${jobId}] Error processing channel ${channel.channelName}:`, error);
         // Continue with next channel
-        updateJobStatus(jobId, 'processing', i + 1, channels.length);
+        await updateJobStatus(jobId, 'processing', i + 1, channels.length);
       }
     }
 
     // Mark job as complete
-    updateJobStatus(jobId, 'completed', channels.length, channels.length);
+    await updateJobStatus(jobId, 'completed', channels.length, channels.length);
     console.log(`[${jobId}] YouTube job completed successfully`);
   } catch (error) {
     console.error(`[${jobId}] YouTube job failed:`, error);
-    updateJobStatus(
+    await updateJobStatus(
       jobId,
       'failed',
       undefined,
@@ -204,7 +206,7 @@ async function processInstagramJob(
   seedAccounts?: string[]
 ): Promise<void> {
   try {
-    updateJobStatus(jobId, 'processing');
+    await updateJobStatus(jobId, 'processing');
 
     const profilesToFetch = Math.min(maxResults * 2, 100); // Fetch 2x since some may be filtered
 
@@ -269,14 +271,14 @@ async function processInstagramJob(
     }
 
     const profiles = Array.from(uniqueProfiles.values());
-    updateJobStatus(jobId, 'processing', 0, profiles.length);
+    await updateJobStatus(jobId, 'processing', 0, profiles.length);
 
     // Step 3: Process each profile
     for (let i = 0; i < profiles.length; i++) {
       const profile = profiles[i];
 
       // Check if job was cancelled or failed
-      const currentJob = getJob(jobId);
+      const currentJob = await getJob(jobId);
       if (currentJob?.status === 'failed') {
         console.log(`[${jobId}] Job was cancelled, stopping processing`);
         return;
@@ -288,14 +290,14 @@ async function processInstagramJob(
         // Pre-filter by follower count
         if (profile.followersCount < MIN_FOLLOWERS) {
           console.log(`[${jobId}] Skipping @${profile.username} - only ${profile.followersCount} followers`);
-          updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+          await updateJobStatus(jobId, 'processing', i + 1, profiles.length);
           continue;
         }
 
         // Pre-filter by post count
         if (profile.postsCount < MIN_POSTS) {
           console.log(`[${jobId}] Skipping @${profile.username} - only ${profile.postsCount} posts`);
-          updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+          await updateJobStatus(jobId, 'processing', i + 1, profiles.length);
           continue;
         }
 
@@ -317,7 +319,7 @@ async function processInstagramJob(
         const firstName = profile.fullName ? profile.fullName.split(' ')[0] : null;
 
         // Save to database
-        addCreator({
+        await addCreator({
           job_id: jobId,
           platform: 'instagram',
           platform_id: profile.userId,
@@ -337,23 +339,23 @@ async function processInstagramJob(
           first_name: firstName,
         });
 
-        updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+        await updateJobStatus(jobId, 'processing', i + 1, profiles.length);
 
         // Small delay to avoid rate limiting
         await sleep(500);
       } catch (error) {
         console.error(`[${jobId}] Error processing Instagram profile @${profile.username}:`, error);
         // Continue with next profile
-        updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+        await updateJobStatus(jobId, 'processing', i + 1, profiles.length);
       }
     }
 
     // Mark job as complete
-    updateJobStatus(jobId, 'completed', profiles.length, profiles.length);
+    await updateJobStatus(jobId, 'completed', profiles.length, profiles.length);
     console.log(`[${jobId}] Instagram job completed successfully`);
   } catch (error) {
     console.error(`[${jobId}] Instagram job failed:`, error);
-    updateJobStatus(
+    await updateJobStatus(
       jobId,
       'failed',
       undefined,
@@ -373,7 +375,7 @@ async function processXJob(
   maxResults: number
 ): Promise<void> {
   try {
-    updateJobStatus(jobId, 'processing');
+    await updateJobStatus(jobId, 'processing');
 
     const profilesToFetch = Math.min(maxResults * 2, 100);
 
@@ -391,7 +393,7 @@ async function processXJob(
     }
 
     const profiles = Array.from(uniqueProfiles.values());
-    updateJobStatus(jobId, 'processing', 0, profiles.length);
+    await updateJobStatus(jobId, 'processing', 0, profiles.length);
 
     console.log(`[${jobId}] Processing ${profiles.length} unique X profiles`);
 
@@ -400,7 +402,7 @@ async function processXJob(
       const profile = profiles[i];
 
       // Check if job was cancelled
-      const currentJob = getJob(jobId);
+      const currentJob = await getJob(jobId);
       if (currentJob?.status === 'failed') {
         console.log(`[${jobId}] Job was cancelled, stopping processing`);
         return;
@@ -430,7 +432,7 @@ async function processXJob(
         const firstName = profile.title ? profile.title.split(/[\s(|@]/)[0] : null;
 
         // Save to database
-        addCreator({
+        await addCreator({
           job_id: jobId,
           platform: 'x',
           platform_id: profile.username,
@@ -450,22 +452,22 @@ async function processXJob(
           first_name: firstName,
         });
 
-        updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+        await updateJobStatus(jobId, 'processing', i + 1, profiles.length);
 
         // Small delay to avoid rate limiting
         await sleep(300);
       } catch (error) {
         console.error(`[${jobId}] Error processing X profile @${profile.username}:`, error);
-        updateJobStatus(jobId, 'processing', i + 1, profiles.length);
+        await updateJobStatus(jobId, 'processing', i + 1, profiles.length);
       }
     }
 
     // Mark job as complete
-    updateJobStatus(jobId, 'completed', profiles.length, profiles.length);
+    await updateJobStatus(jobId, 'completed', profiles.length, profiles.length);
     console.log(`[${jobId}] X job completed successfully`);
   } catch (error) {
     console.error(`[${jobId}] X job failed:`, error);
-    updateJobStatus(
+    await updateJobStatus(
       jobId,
       'failed',
       undefined,
@@ -491,30 +493,33 @@ export function continueSearchJob(
 ): void {
   console.log(`[${jobId}] Continuing search for "${keyword}" on ${platform}`);
 
-  // Get existing creators count to calculate query offset
-  const existingCreators = getCreatorsByJobId(jobId);
-  const queryOffset = Math.floor(existingCreators.length / 10) * 5; // Rough estimate: skip 5 queries per 10 results
+  // Start async continuation
+  (async () => {
+    // Get existing creators count to calculate query offset
+    const existingCreators = await getCreatorsByJobId(jobId);
+    const queryOffset = Math.floor(existingCreators.length / 10) * 5; // Rough estimate: skip 5 queries per 10 results
 
-  if (platform === 'instagram') {
-    console.log(`[${jobId}] Continuing Instagram search with offset ${queryOffset}`);
-    continueInstagramJob(jobId, keyword, maxResults, queryOffset).catch((error) => {
-      console.error(`Continue Instagram Job ${jobId} failed:`, error);
-      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
-    });
-  } else if (platform === 'x') {
-    console.log(`[${jobId}] Continuing X search with offset ${queryOffset}`);
-    continueXJob(jobId, keyword, maxResults, queryOffset).catch((error) => {
-      console.error(`Continue X Job ${jobId} failed:`, error);
-      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
-    });
-  } else {
-    // YouTube continuation - search with different keywords
-    console.log(`[${jobId}] Continuing YouTube search`);
-    continueYouTubeJob(jobId, keyword, maxResults).catch((error) => {
-      console.error(`Continue YouTube Job ${jobId} failed:`, error);
-      updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
-    });
-  }
+    if (platform === 'instagram') {
+      console.log(`[${jobId}] Continuing Instagram search with offset ${queryOffset}`);
+      continueInstagramJob(jobId, keyword, maxResults, queryOffset).catch(async (error) => {
+        console.error(`Continue Instagram Job ${jobId} failed:`, error);
+        await updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+      });
+    } else if (platform === 'x') {
+      console.log(`[${jobId}] Continuing X search with offset ${queryOffset}`);
+      continueXJob(jobId, keyword, maxResults, queryOffset).catch(async (error) => {
+        console.error(`Continue X Job ${jobId} failed:`, error);
+        await updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+      });
+    } else {
+      // YouTube continuation - search with different keywords
+      console.log(`[${jobId}] Continuing YouTube search`);
+      continueYouTubeJob(jobId, keyword, maxResults).catch(async (error) => {
+        console.error(`Continue YouTube Job ${jobId} failed:`, error);
+        await updateJobStatus(jobId, 'failed', undefined, undefined, error.message);
+      });
+    }
+  })();
 }
 
 /**
@@ -527,10 +532,10 @@ async function continueInstagramJob(
   queryOffset: number
 ): Promise<void> {
   try {
-    updateJobStatus(jobId, 'processing');
+    await updateJobStatus(jobId, 'processing');
 
     // Get existing usernames to exclude
-    const existingIdentifiers = getExistingIdentifiers(jobId);
+    const existingIdentifiers = await getExistingIdentifiers(jobId);
     console.log(`[${jobId}] Excluding ${existingIdentifiers.size} existing creators`);
 
     const profilesToFetch = Math.min(maxResults * 2, 100);
@@ -542,7 +547,7 @@ async function continueInstagramJob(
 
     if (serpResults.length === 0) {
       console.log(`[${jobId}] No new profiles found, completing job`);
-      updateJobStatus(jobId, 'completed');
+      await updateJobStatus(jobId, 'completed');
       return;
     }
 
@@ -554,7 +559,7 @@ async function continueInstagramJob(
     console.log(`[${jobId}] ${usernames.length} new unique usernames to process`);
 
     if (usernames.length === 0) {
-      updateJobStatus(jobId, 'completed');
+      await updateJobStatus(jobId, 'completed');
       return;
     }
 
@@ -584,7 +589,7 @@ async function continueInstagramJob(
     for (let i = 0; i < profiles.length; i++) {
       const profile = profiles[i];
 
-      const currentJob = getJob(jobId);
+      const currentJob = await getJob(jobId);
       if (currentJob?.status === 'failed') {
         console.log(`[${jobId}] Job was cancelled, stopping`);
         return;
@@ -607,7 +612,7 @@ async function continueInstagramJob(
 
         const firstName = profile.fullName ? profile.fullName.split(' ')[0] : null;
 
-        addCreator({
+        await addCreator({
           job_id: jobId,
           platform: 'instagram',
           platform_id: profile.userId,
@@ -633,11 +638,11 @@ async function continueInstagramJob(
       }
     }
 
-    updateJobStatus(jobId, 'completed');
+    await updateJobStatus(jobId, 'completed');
     console.log(`[${jobId}] Instagram continuation completed`);
   } catch (error) {
     console.error(`[${jobId}] Instagram continuation failed:`, error);
-    updateJobStatus(jobId, 'failed', undefined, undefined, error instanceof Error ? error.message : 'Unknown error');
+    await updateJobStatus(jobId, 'failed', undefined, undefined, error instanceof Error ? error.message : 'Unknown error');
   }
 }
 
@@ -651,9 +656,9 @@ async function continueXJob(
   queryOffset: number
 ): Promise<void> {
   try {
-    updateJobStatus(jobId, 'processing');
+    await updateJobStatus(jobId, 'processing');
 
-    const existingIdentifiers = getExistingIdentifiers(jobId);
+    const existingIdentifiers = await getExistingIdentifiers(jobId);
     console.log(`[${jobId}] Excluding ${existingIdentifiers.size} existing X profiles`);
 
     const profilesToFetch = Math.min(maxResults * 2, 100);
@@ -662,7 +667,7 @@ async function continueXJob(
     console.log(`[${jobId}] SerpAPI found ${serpResults.length} new X profiles`);
 
     if (serpResults.length === 0) {
-      updateJobStatus(jobId, 'completed');
+      await updateJobStatus(jobId, 'completed');
       return;
     }
 
@@ -673,7 +678,7 @@ async function continueXJob(
     for (let i = 0; i < newProfiles.length; i++) {
       const profile = newProfiles[i];
 
-      const currentJob = getJob(jobId);
+      const currentJob = await getJob(jobId);
       if (currentJob?.status === 'failed') {
         return;
       }
@@ -692,7 +697,7 @@ async function continueXJob(
 
         const firstName = profile.title ? profile.title.split(/[\s(|@]/)[0] : null;
 
-        addCreator({
+        await addCreator({
           job_id: jobId,
           platform: 'x',
           platform_id: profile.username,
@@ -718,11 +723,11 @@ async function continueXJob(
       }
     }
 
-    updateJobStatus(jobId, 'completed');
+    await updateJobStatus(jobId, 'completed');
     console.log(`[${jobId}] X continuation completed`);
   } catch (error) {
     console.error(`[${jobId}] X continuation failed:`, error);
-    updateJobStatus(jobId, 'failed', undefined, undefined, error instanceof Error ? error.message : 'Unknown error');
+    await updateJobStatus(jobId, 'failed', undefined, undefined, error instanceof Error ? error.message : 'Unknown error');
   }
 }
 
@@ -735,9 +740,9 @@ async function continueYouTubeJob(
   maxResults: number
 ): Promise<void> {
   try {
-    updateJobStatus(jobId, 'processing');
+    await updateJobStatus(jobId, 'processing');
 
-    const existingIdentifiers = getExistingIdentifiers(jobId);
+    const existingIdentifiers = await getExistingIdentifiers(jobId);
     console.log(`[${jobId}] Excluding ${existingIdentifiers.size} existing YouTube channels`);
 
     // Add variations to keyword to get different results
@@ -761,7 +766,7 @@ async function continueYouTubeJob(
     for (let i = 0; i < newChannels.length; i++) {
       const channel = newChannels[i];
 
-      const currentJob = getJob(jobId);
+      const currentJob = await getJob(jobId);
       if (currentJob?.status === 'failed') {
         return;
       }
@@ -788,7 +793,7 @@ async function continueYouTubeJob(
           }
         }
 
-        addCreator({
+        await addCreator({
           job_id: jobId,
           platform: 'youtube',
           platform_id: channel.channelId,
@@ -814,10 +819,10 @@ async function continueYouTubeJob(
       }
     }
 
-    updateJobStatus(jobId, 'completed');
+    await updateJobStatus(jobId, 'completed');
     console.log(`[${jobId}] YouTube continuation completed`);
   } catch (error) {
     console.error(`[${jobId}] YouTube continuation failed:`, error);
-    updateJobStatus(jobId, 'failed', undefined, undefined, error instanceof Error ? error.message : 'Unknown error');
+    await updateJobStatus(jobId, 'failed', undefined, undefined, error instanceof Error ? error.message : 'Unknown error');
   }
 }

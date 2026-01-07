@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id: jobId } = await params;
 
-    const job = getJob(jobId);
+    const job = await getJob(jobId);
     if (!job) {
       return NextResponse.json(
         { error: 'Job not found' },
@@ -16,7 +16,7 @@ export async function GET(
       );
     }
 
-    const funnels = getFunnelsByJobId(jobId);
+    const funnels = await getFunnelsByJobId(jobId);
 
     // Build CSV
     const headers = [

@@ -8,7 +8,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const job = getJob(id);
+    const job = await getJob(id);
     if (!job) {
       return NextResponse.json(
         { error: 'Job not found' },
@@ -16,7 +16,7 @@ export async function GET(
       );
     }
 
-    const creators = getQualifiedCreatorsByJobId(id);
+    const creators = await getQualifiedCreatorsByJobId(id);
 
     // Build CSV with multi-platform support
     const headers = [
@@ -38,10 +38,10 @@ export async function GET(
     const rows = creators.map((c) => [
       escapeCsvField(c.platform || 'youtube'),
       escapeCsvField(c.username || ''),
-      escapeCsvField(c.display_name || c.channel_name || ''),
-      escapeCsvField(c.profile_url || c.channel_url || ''),
-      (c.followers ?? c.subscribers ?? 0).toString(),
-      (c.post_count ?? c.video_count ?? 0).toString(),
+      escapeCsvField(c.display_name || ''),
+      escapeCsvField(c.profile_url || ''),
+      (c.followers ?? 0).toString(),
+      (c.post_count ?? 0).toString(),
       (c.total_views ?? 0).toString(),
       (c.engagement_rate ?? 0).toFixed(2),
       escapeCsvField(c.email || ''),

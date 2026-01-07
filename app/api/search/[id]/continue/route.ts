@@ -12,7 +12,7 @@ export async function POST(
     const { maxResults = 50 } = body;
 
     // Get the existing job
-    const job = getJob(jobId);
+    const job = await getJob(jobId);
     if (!job) {
       return NextResponse.json(
         { error: 'Job not found' },
