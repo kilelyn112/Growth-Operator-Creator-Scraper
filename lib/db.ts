@@ -320,6 +320,37 @@ export async function findExistingCreatorsByNiche(platform: Platform, niche: str
   return (data || []).map(c => ({ ...c, qualified: Boolean(c.qualified) })) as Creator[];
 }
 
+// FLYWHEEL: Search creators by keyword across multiple fields (main flywheel function)
+export async function searchCreatorsByKeyword(platform: Platform, keyword: string, limit: number = 100): Promise<Creator[]> {
+  const searchTerm = `%${keyword.toLowerCase()}%`;
+
+  // Search across multiple relevant fields
+  const { data, error } = await supabase
+    .from('creators')
+    .select('*')
+    .eq('platform', platform)
+    .or(`niche.ilike.${searchTerm},display_name.ilike.${searchTerm},bio.ilike.${searchTerm},qualification_reason.ilike.${searchTerm}`)
+    .order('followers', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error searching creators:', error);
+    return [];
+  }
+  return (data || []).map(c => ({ ...c, qualified: Boolean(c.qualified) })) as Creator[];
+}
+
+// FLYWHEEL: Get all platform_ids from database to exclude during scraping
+export async function getExistingPlatformIds(platform: Platform): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('creators')
+    .select('platform_id')
+    .eq('platform', platform);
+
+  if (error) return new Set();
+  return new Set((data || []).map(c => c.platform_id));
+}
+
 // ============ FUNNEL OPERATIONS ============
 
 export interface AddFunnelInput {

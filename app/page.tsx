@@ -36,6 +36,8 @@ interface Creator {
   channelUrl?: string;
   subscribers?: number;
   videoCount?: number;
+  // Flywheel: indicates if this result came from cache
+  fromCache?: boolean;
 }
 
 interface Job {
@@ -179,7 +181,27 @@ export default function Home() {
       const data = await response.json();
       setJobId(data.jobId);
 
-      // Start polling for results
+      // FLYWHEEL: Show cached results immediately if available
+      if (data.cachedCreators && data.cachedCreators.length > 0) {
+        console.log(`[FLYWHEEL] Showing ${data.cachedCreators.length} cached results instantly`);
+        setCreators(data.cachedCreators);
+        setSummary({
+          total: data.cachedCreators.length,
+          qualified: data.cachedCreators.filter((c: Creator) => c.qualified).length,
+          withEmail: data.cachedCreators.filter((c: Creator) => c.email).length,
+        });
+        // Set a synthetic job to show the results UI
+        setJob({
+          id: data.jobId,
+          keyword: keyword,
+          platform: selectedPlatform,
+          status: 'processing',
+          progress: 0,
+          total: data.cachedCount || 0,
+        });
+      }
+
+      // Start polling for new results (will merge with cached)
       pollJob(data.jobId);
     } catch (err) {
       console.error('Error starting search:', err);
@@ -217,6 +239,26 @@ export default function Home() {
 
       const data = await response.json();
       setJobId(data.jobId);
+
+      // FLYWHEEL: Show cached results immediately if available
+      if (data.cachedCreators && data.cachedCreators.length > 0) {
+        console.log(`[FLYWHEEL] Showing ${data.cachedCreators.length} cached results instantly`);
+        setCreators(data.cachedCreators);
+        setSummary({
+          total: data.cachedCreators.length,
+          qualified: data.cachedCreators.filter((c: Creator) => c.qualified).length,
+          withEmail: data.cachedCreators.filter((c: Creator) => c.email).length,
+        });
+        // Set a synthetic job to show the results UI
+        setJob({
+          id: data.jobId,
+          keyword: 'similar creators',
+          platform: 'instagram',
+          status: 'processing',
+          progress: 0,
+          total: data.cachedCount || 0,
+        });
+      }
 
       // Start polling for results
       pollJob(data.jobId);
@@ -328,6 +370,60 @@ export default function Home() {
 
       const data = await response.json();
       setFunnelJobId(data.jobId);
+
+      // FLYWHEEL: Show cached funnels immediately if available
+      if (data.cachedFunnels && data.cachedFunnels.length > 0) {
+        console.log(`[FLYWHEEL] Showing ${data.cachedFunnels.length} cached funnels instantly`);
+        // Convert to Funnel format
+        const cachedAsFunnels = data.cachedFunnels.map((f: Record<string, unknown>) => ({
+          id: f.id,
+          funnel_url: f.funnelUrl,
+          domain: f.domain,
+          platform: f.platform,
+          niche: f.niche,
+          quality_score: f.qualityScore,
+          issues: f.issues,
+          has_mobile_viewport: f.hasMobileViewport,
+          has_clear_cta: f.hasClearCta,
+          has_testimonials: f.hasTestimonials,
+          has_trust_badges: f.hasTrustBadges,
+          page_load_time: f.pageLoadTime,
+          owner_name: f.ownerName,
+          owner_email: f.ownerEmail,
+          owner_phone: f.ownerPhone,
+          owner_instagram: f.ownerInstagram,
+          owner_youtube: f.ownerYoutube,
+          owner_x: f.ownerX,
+          owner_linkedin: f.ownerLinkedin,
+          owner_website: f.ownerWebsite,
+          discovery_source: f.discoverySource,
+          search_query: f.searchQuery,
+          page_title: f.pageTitle,
+          page_description: f.pageDescription,
+          created_at: f.createdAt,
+          updated_at: f.updatedAt,
+        }));
+        setFunnels(cachedAsFunnels);
+        setFunnelSummary({
+          total: cachedAsFunnels.length,
+          withEmail: cachedAsFunnels.filter((f: Funnel) => f.owner_email).length,
+          clickfunnels: cachedAsFunnels.filter((f: Funnel) => f.platform === 'clickfunnels').length,
+          gohighlevel: cachedAsFunnels.filter((f: Funnel) => f.platform === 'gohighlevel').length,
+          other: cachedAsFunnels.filter((f: Funnel) => f.platform === 'other').length,
+          avgQuality: cachedAsFunnels.length > 0
+            ? Math.round(cachedAsFunnels.reduce((acc: number, f: Funnel) => acc + f.quality_score, 0) / cachedAsFunnels.length)
+            : 0,
+        });
+        // Set a synthetic job to show the results UI
+        setFunnelJob({
+          id: data.jobId,
+          niche: funnelNiche.trim(),
+          status: 'processing',
+          progress: 0,
+          total: data.cachedCount || 0,
+        });
+      }
+
       pollFunnelJob(data.jobId);
     } catch (err) {
       console.error('Error starting funnel search:', err);

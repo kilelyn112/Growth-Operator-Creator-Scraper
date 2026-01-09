@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { createJob, updateJobStatus, addFunnel, getExistingFunnelDomains } from '@/lib/db';
+import { createJob, updateJobStatus, addFunnel, getExistingFunnelDomains, findExistingFunnelsByNiche } from '@/lib/db';
 import { generateFunnelQueries, searchForFunnels } from '@/lib/funnel-search';
 import { scrapeFunnelPage, toFunnelInput } from '@/lib/funnel-scraper';
 
@@ -16,6 +16,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // FLYWHEEL: Check database first for cached funnels
+    const cachedFunnels = await findExistingFunnelsByNiche(niche, maxResults);
+    console.log(`[FLYWHEEL] Found ${cachedFunnels.length} cached funnels for niche: ${niche}`);
+
     // Create a job to track progress
     const jobId = uuidv4();
     await createJob(jobId, niche, maxResults, 'youtube', 'funnel');
@@ -24,10 +28,42 @@ export async function POST(request: NextRequest) {
     // Start async processing
     processFunnelJob(jobId, niche, maxResults);
 
+    // Return cached results immediately along with job ID for new results
     return NextResponse.json({
       jobId,
       niche,
       message: 'Funnel search started',
+      // FLYWHEEL: Include cached funnels in initial response
+      cachedFunnels: cachedFunnels.map((f) => ({
+        id: f.id,
+        funnelUrl: f.funnel_url,
+        domain: f.domain,
+        platform: f.platform,
+        niche: f.niche,
+        qualityScore: f.quality_score,
+        issues: f.issues,
+        hasMobileViewport: f.has_mobile_viewport,
+        hasClearCta: f.has_clear_cta,
+        hasTestimonials: f.has_testimonials,
+        hasTrustBadges: f.has_trust_badges,
+        pageLoadTime: f.page_load_time,
+        ownerName: f.owner_name,
+        ownerEmail: f.owner_email,
+        ownerPhone: f.owner_phone,
+        ownerInstagram: f.owner_instagram,
+        ownerYoutube: f.owner_youtube,
+        ownerX: f.owner_x,
+        ownerLinkedin: f.owner_linkedin,
+        ownerWebsite: f.owner_website,
+        discoverySource: f.discovery_source,
+        searchQuery: f.search_query,
+        pageTitle: f.page_title,
+        pageDescription: f.page_description,
+        createdAt: f.created_at,
+        updatedAt: f.updated_at,
+        fromCache: true,
+      })),
+      cachedCount: cachedFunnels.length,
     });
   } catch (error) {
     console.error('Error starting funnel search:', error);
