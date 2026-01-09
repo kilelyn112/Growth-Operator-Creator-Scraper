@@ -244,9 +244,14 @@ export async function addCreator(creator: AddCreatorInput): Promise<Creator> {
 
 // Link creator to job via job_results table
 async function linkCreatorToJob(jobId: string, creatorId: number): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('job_results')
-    .upsert({ job_id: jobId, creator_id: creatorId }, { onConflict: 'job_id,creator_id', ignoreDuplicates: true });
+    .insert({ job_id: jobId, creator_id: creatorId });
+
+  // Ignore duplicate key errors (23505), log others
+  if (error && error.code !== '23505') {
+    console.error('Error linking creator to job:', error);
+  }
 }
 
 export async function getCreatorById(id: number): Promise<Creator | null> {
@@ -415,9 +420,14 @@ export async function addFunnel(funnel: AddFunnelInput): Promise<Funnel> {
 }
 
 async function linkFunnelToJob(jobId: string, funnelId: number): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('job_results')
-    .upsert({ job_id: jobId, funnel_id: funnelId }, { onConflict: 'job_id,funnel_id', ignoreDuplicates: true });
+    .insert({ job_id: jobId, funnel_id: funnelId });
+
+  // Ignore duplicate key errors (23505), log others
+  if (error && error.code !== '23505') {
+    console.error('Error linking funnel to job:', error);
+  }
 }
 
 export async function getFunnelById(id: number): Promise<Funnel | null> {
