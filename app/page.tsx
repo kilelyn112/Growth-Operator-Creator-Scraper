@@ -88,6 +88,7 @@ export default function Home() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [creators, setCreators] = useState<Creator[]>([]);
+  const [cachedCreators, setCachedCreators] = useState<Creator[]>([]); // FLYWHEEL: Track cached results separately
   const [summary, setSummary] = useState<Summary>({ total: 0, qualified: 0, withEmail: 0 });
   const [isSearching, setIsSearching] = useState(false);
   const [isFindingMore, setIsFindingMore] = useState(false);
@@ -108,7 +109,7 @@ export default function Home() {
   const [isFunnelSearching, setIsFunnelSearching] = useState(false);
   const [funnelError, setFunnelError] = useState<string | null>(null);
 
-  const pollJob = useCallback(async (id: string) => {
+  const pollJob = useCallback(async (id: string, cached: Creator[] = []) => {
     try {
       const response = await fetch(`/api/search/${id}`);
 
@@ -118,6 +119,7 @@ export default function Home() {
         setJob(null);
         setJobId(null);
         setCreators([]);
+        setCachedCreators([]);
         setSummary({ total: 0, qualified: 0, withEmail: 0 });
         setIsSearching(false);
         return;
@@ -129,12 +131,24 @@ export default function Home() {
 
       const data = await response.json();
       setJob(data.job);
-      setCreators(data.creators);
-      setSummary(data.summary);
+
+      // FLYWHEEL: Merge cached results with new results from job
+      // Deduplicate by platformId (cached creators might be re-scraped)
+      const newCreators = data.creators as Creator[];
+      const newPlatformIds = new Set(newCreators.map((c: Creator) => c.platformId));
+      const uniqueCached = cached.filter((c: Creator) => !newPlatformIds.has(c.platformId));
+      const mergedCreators = [...uniqueCached, ...newCreators];
+
+      setCreators(mergedCreators);
+      setSummary({
+        total: mergedCreators.length,
+        qualified: mergedCreators.filter((c: Creator) => c.qualified).length,
+        withEmail: mergedCreators.filter((c: Creator) => c.email).length,
+      });
 
       // Continue polling if job is still in progress
       if (data.job.status === 'pending' || data.job.status === 'processing') {
-        setTimeout(() => pollJob(id), 2000);
+        setTimeout(() => pollJob(id, cached), 2000);
       } else {
         setIsSearching(false);
       }
@@ -150,6 +164,7 @@ export default function Home() {
     setError(null);
     setJob(null);
     setCreators([]);
+    setCachedCreators([]);
     setSummary({ total: 0, qualified: 0, withEmail: 0 });
     setSelectedNiche(niche);
 
@@ -182,13 +197,16 @@ export default function Home() {
       setJobId(data.jobId);
 
       // FLYWHEEL: Show cached results immediately if available
+      let cached: Creator[] = [];
       if (data.cachedCreators && data.cachedCreators.length > 0) {
         console.log(`[FLYWHEEL] Showing ${data.cachedCreators.length} cached results instantly`);
-        setCreators(data.cachedCreators);
+        cached = data.cachedCreators;
+        setCachedCreators(cached);
+        setCreators(cached);
         setSummary({
-          total: data.cachedCreators.length,
-          qualified: data.cachedCreators.filter((c: Creator) => c.qualified).length,
-          withEmail: data.cachedCreators.filter((c: Creator) => c.email).length,
+          total: cached.length,
+          qualified: cached.filter((c: Creator) => c.qualified).length,
+          withEmail: cached.filter((c: Creator) => c.email).length,
         });
         // Set a synthetic job to show the results UI
         setJob({
@@ -202,7 +220,7 @@ export default function Home() {
       }
 
       // Start polling for new results (will merge with cached)
-      pollJob(data.jobId);
+      pollJob(data.jobId, cached);
     } catch (err) {
       console.error('Error starting search:', err);
       setError('Failed to start search. Please try again.');
@@ -218,6 +236,7 @@ export default function Home() {
     setError(null);
     setJob(null);
     setCreators([]);
+    setCachedCreators([]);
     setSummary({ total: 0, qualified: 0, withEmail: 0 });
     setSelectedNiche(null);
 
@@ -241,13 +260,16 @@ export default function Home() {
       setJobId(data.jobId);
 
       // FLYWHEEL: Show cached results immediately if available
+      let cached: Creator[] = [];
       if (data.cachedCreators && data.cachedCreators.length > 0) {
         console.log(`[FLYWHEEL] Showing ${data.cachedCreators.length} cached results instantly`);
-        setCreators(data.cachedCreators);
+        cached = data.cachedCreators;
+        setCachedCreators(cached);
+        setCreators(cached);
         setSummary({
-          total: data.cachedCreators.length,
-          qualified: data.cachedCreators.filter((c: Creator) => c.qualified).length,
-          withEmail: data.cachedCreators.filter((c: Creator) => c.email).length,
+          total: cached.length,
+          qualified: cached.filter((c: Creator) => c.qualified).length,
+          withEmail: cached.filter((c: Creator) => c.email).length,
         });
         // Set a synthetic job to show the results UI
         setJob({
@@ -260,8 +282,8 @@ export default function Home() {
         });
       }
 
-      // Start polling for results
-      pollJob(data.jobId);
+      // Start polling for results (merge with cached)
+      pollJob(data.jobId, cached);
     } catch (err) {
       console.error('Error starting seed search:', err);
       setError('Failed to start search. Please try again.');
@@ -273,6 +295,7 @@ export default function Home() {
     setJobId(null);
     setJob(null);
     setCreators([]);
+    setCachedCreators([]);
     setSummary({ total: 0, qualified: 0, withEmail: 0 });
     setError(null);
     setSelectedNiche(null);
@@ -296,9 +319,9 @@ export default function Home() {
         throw new Error('Failed to continue search');
       }
 
-      // Start polling for results again
+      // Start polling for results again (keep existing creators as "cached" to merge with)
       setIsSearching(true);
-      pollJob(jobId);
+      pollJob(jobId, creators);
     } catch (err) {
       console.error('Error continuing search:', err);
       setError('Failed to find more creators. Please try again.');
