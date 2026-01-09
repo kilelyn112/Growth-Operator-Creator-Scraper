@@ -167,6 +167,7 @@ async function processYouTubeJob(
           qualification_reason: qualification.reason,
           email: email,
           first_name: null,
+          niche: keyword, // FLYWHEEL: Store niche for future cached searches
         });
 
         await updateJobStatus(jobId, 'processing', i + 1, channels.length);
@@ -337,6 +338,7 @@ async function processInstagramJob(
           qualification_reason: qualification.reason,
           email: email,
           first_name: firstName,
+          niche: keyword, // FLYWHEEL: Store niche for future cached searches
         });
 
         await updateJobStatus(jobId, 'processing', i + 1, profiles.length);
@@ -450,6 +452,7 @@ async function processXJob(
           qualification_reason: qualification.reason,
           email: email,
           first_name: firstName,
+          niche: keyword, // FLYWHEEL: Store niche for future cached searches
         });
 
         await updateJobStatus(jobId, 'processing', i + 1, profiles.length);
@@ -630,6 +633,7 @@ async function continueInstagramJob(
           qualification_reason: qualification.reason,
           email: email,
           first_name: firstName,
+          niche: keyword, // FLYWHEEL: Store niche for future cached searches
         });
 
         await sleep(500);
@@ -715,6 +719,7 @@ async function continueXJob(
           qualification_reason: qualification.reason,
           email: email,
           first_name: firstName,
+          niche: keyword, // FLYWHEEL: Store niche for future cached searches
         });
 
         await sleep(300);
@@ -811,6 +816,7 @@ async function continueYouTubeJob(
           qualification_reason: qualification.reason,
           email: email,
           first_name: null,
+          niche: keyword, // FLYWHEEL: Store niche for future cached searches
         });
 
         await sleep(500);
