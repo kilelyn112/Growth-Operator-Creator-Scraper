@@ -109,6 +109,18 @@ export default function Home() {
   const pollJob = useCallback(async (id: string) => {
     try {
       const response = await fetch(`/api/search/${id}`);
+
+      // Handle 404 - job not found (stale job ID from before migration)
+      if (response.status === 404) {
+        console.log('Job not found, clearing state');
+        setJob(null);
+        setJobId(null);
+        setCreators([]);
+        setSummary({ total: 0, qualified: 0, withEmail: 0 });
+        setIsSearching(false);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error('Failed to fetch job status');
       }
@@ -258,6 +270,18 @@ export default function Home() {
   const pollFunnelJob = useCallback(async (id: string) => {
     try {
       const response = await fetch(`/api/funnel/search/${id}`);
+
+      // Handle 404 - job not found (stale job ID from before migration)
+      if (response.status === 404) {
+        console.log('Funnel job not found, clearing state');
+        setFunnelJob(null);
+        setFunnelJobId(null);
+        setFunnels([]);
+        setFunnelSummary({ total: 0, withEmail: 0, clickfunnels: 0, gohighlevel: 0, other: 0, avgQuality: 0 });
+        setIsFunnelSearching(false);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error('Failed to fetch funnel job status');
       }
