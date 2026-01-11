@@ -60,19 +60,19 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
     switch (platform) {
       case 'clickfunnels':
         return (
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-200">
             ClickFunnels
           </span>
         );
       case 'gohighlevel':
         return (
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 border border-purple-200">
             GoHighLevel
           </span>
         );
       default:
         return (
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--bg-subtle)] text-[var(--text-secondary)] border border-[var(--border-default)]">
             Other
           </span>
         );
@@ -80,49 +80,49 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
   };
 
   const getQualityColor = (score: number) => {
-    if (score >= 70) return 'text-[var(--signal-success)]';
-    if (score >= 50) return 'text-[var(--signal-warning)]';
-    return 'text-[var(--signal-danger)]';
+    if (score >= 70) return 'text-[var(--status-success)]';
+    if (score >= 50) return 'text-[var(--status-warning)]';
+    return 'text-[var(--status-error)]';
   };
 
   return (
     <div className="space-y-4">
       {/* Summary Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 bg-[var(--bg-surface)] rounded-xl border border-[var(--bg-border)]">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-default)] shadow-[var(--shadow-sm)]">
         <div className="text-center">
           <div className="text-2xl font-mono font-bold text-[var(--text-primary)]">
             {summary.total}
           </div>
-          <div className="text-xs text-[var(--text-tertiary)]">Total Found</div>
+          <div className="text-xs text-[var(--text-muted)]">Total Found</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-mono font-bold text-[var(--signal-success)]">
+          <div className="text-2xl font-mono font-bold text-[var(--status-success)]">
             {summary.withEmail}
           </div>
-          <div className="text-xs text-[var(--text-tertiary)]">With Email</div>
+          <div className="text-xs text-[var(--text-muted)]">With Email</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-mono font-bold text-blue-400">
+          <div className="text-2xl font-mono font-bold text-blue-600">
             {summary.clickfunnels}
           </div>
-          <div className="text-xs text-[var(--text-tertiary)]">ClickFunnels</div>
+          <div className="text-xs text-[var(--text-muted)]">ClickFunnels</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-mono font-bold text-purple-400">
+          <div className="text-2xl font-mono font-bold text-purple-600">
             {summary.gohighlevel}
           </div>
-          <div className="text-xs text-[var(--text-tertiary)]">GoHighLevel</div>
+          <div className="text-xs text-[var(--text-muted)]">GoHighLevel</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-mono font-bold text-[var(--signal-warning)]">
+          <div className="text-2xl font-mono font-bold text-[var(--status-warning)]">
             {summary.avgQuality}
           </div>
-          <div className="text-xs text-[var(--text-tertiary)]">Avg Quality</div>
+          <div className="text-xs text-[var(--text-muted)]">Avg Quality</div>
         </div>
         <div className="text-center">
           <a
             href={`/api/funnel/export/${jobId}`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--signal-action)] hover:bg-[var(--signal-action)]/80 text-black font-medium rounded-lg transition-colors"
+            className="btn-accent"
           >
             Export CSV
           </a>
@@ -135,8 +135,8 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
           onClick={() => setFilterWithEmail(!filterWithEmail)}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             filterWithEmail
-              ? 'bg-[var(--signal-success)]/20 text-[var(--signal-success)] border border-[var(--signal-success)]'
-              : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--bg-border)] hover:border-[var(--signal-action)]'
+              ? 'bg-[var(--status-success-light)] text-[var(--status-success)] border border-[var(--status-success)]'
+              : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-default)] hover:border-[var(--accent)]'
           }`}
         >
           With Email Only
@@ -145,8 +145,8 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
           onClick={() => setFilterPlatform(filterPlatform === 'clickfunnels' ? null : 'clickfunnels')}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             filterPlatform === 'clickfunnels'
-              ? 'bg-blue-500/20 text-blue-400 border border-blue-500'
-              : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--bg-border)] hover:border-blue-500'
+              ? 'bg-blue-50 text-blue-600 border border-blue-300'
+              : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-default)] hover:border-blue-400'
           }`}
         >
           ClickFunnels
@@ -155,8 +155,8 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
           onClick={() => setFilterPlatform(filterPlatform === 'gohighlevel' ? null : 'gohighlevel')}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
             filterPlatform === 'gohighlevel'
-              ? 'bg-purple-500/20 text-purple-400 border border-purple-500'
-              : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--bg-border)] hover:border-purple-500'
+              ? 'bg-purple-50 text-purple-600 border border-purple-300'
+              : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-default)] hover:border-purple-400'
           }`}
         >
           GoHighLevel
@@ -164,49 +164,49 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
       </div>
 
       {/* Results Table */}
-      <div className="overflow-x-auto rounded-xl border border-[var(--bg-border)]">
+      <div className="overflow-x-auto rounded-xl border border-[var(--border-default)] shadow-[var(--shadow-sm)]">
         <table className="w-full">
           <thead>
-            <tr className="bg-[var(--bg-surface)] border-b border-[var(--bg-border)]">
+            <tr className="bg-[var(--bg-subtle)] border-b border-[var(--border-default)]">
               <th
                 onClick={() => handleSort('platform')}
-                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]"
+                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]"
               >
                 Platform {sortKey === 'platform' && (sortAsc ? '↑' : '↓')}
               </th>
               <th
                 onClick={() => handleSort('domain')}
-                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]"
+                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]"
               >
                 Domain {sortKey === 'domain' && (sortAsc ? '↑' : '↓')}
               </th>
               <th
                 onClick={() => handleSort('quality_score')}
-                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]"
+                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]"
               >
                 Quality {sortKey === 'quality_score' && (sortAsc ? '↑' : '↓')}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                 Owner Info
               </th>
               <th
                 onClick={() => handleSort('owner_email')}
-                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]"
+                className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)]"
               >
                 Email {sortKey === 'owner_email' && (sortAsc ? '↑' : '↓')}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
                 Issues
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--bg-border)]">
+          <tbody className="divide-y divide-[var(--border-subtle)]">
             {sorted.map((funnel, index) => (
               <tr
                 key={funnel.id}
                 className={`
-                  transition-colors hover:bg-[var(--bg-elevated)]
-                  ${funnel.owner_email ? 'bg-[var(--signal-success)]/5' : 'bg-[var(--bg-base)]'}
+                  transition-colors hover:bg-[var(--bg-subtle)]
+                  ${funnel.owner_email ? 'bg-[var(--status-success-light)]' : 'bg-[var(--bg-primary)]'}
                 `}
                 style={{ animationDelay: `${index * 30}ms` }}
               >
@@ -218,12 +218,12 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
                     href={funnel.funnel_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[var(--signal-action)] hover:underline font-mono text-sm"
+                    className="text-[var(--accent)] hover:text-[var(--accent-hover)] hover:underline font-mono text-sm"
                   >
                     {funnel.domain}
                   </a>
                   {funnel.page_title && (
-                    <div className="text-xs text-[var(--text-tertiary)] truncate max-w-[200px]">
+                    <div className="text-xs text-[var(--text-muted)] truncate max-w-[200px]">
                       {funnel.page_title}
                     </div>
                   )}
@@ -244,7 +244,7 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
                           href={`https://instagram.com/${funnel.owner_instagram}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-pink-400 hover:text-pink-300 text-xs"
+                          className="text-pink-500 hover:text-pink-600 text-xs"
                         >
                           @{funnel.owner_instagram}
                         </a>
@@ -254,7 +254,7 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
                           href={`https://youtube.com/@${funnel.owner_youtube}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-red-400 hover:text-red-300 text-xs"
+                          className="text-red-500 hover:text-red-600 text-xs"
                         >
                           YT
                         </a>
@@ -264,7 +264,7 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
                           href={`https://x.com/${funnel.owner_x}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-gray-400 hover:text-gray-300 text-xs"
+                          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs"
                         >
                           @{funnel.owner_x}
                         </a>
@@ -276,12 +276,12 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
                   {funnel.owner_email ? (
                     <a
                       href={`mailto:${funnel.owner_email}`}
-                      className="text-[var(--signal-success)] hover:underline text-sm font-mono"
+                      className="text-[var(--status-success)] hover:underline text-sm font-mono"
                     >
                       {funnel.owner_email}
                     </a>
                   ) : (
-                    <span className="text-[var(--text-tertiary)] text-sm">-</span>
+                    <span className="text-[var(--text-muted)] text-sm">—</span>
                   )}
                   {funnel.owner_phone && (
                     <div className="text-xs text-[var(--text-secondary)]">{funnel.owner_phone}</div>
@@ -289,7 +289,7 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
                 </td>
                 <td className="px-4 py-3">
                   {funnel.issues && (
-                    <div className="text-xs text-[var(--signal-warning)]">
+                    <div className="text-xs text-[var(--status-warning)]">
                       {JSON.parse(funnel.issues).slice(0, 2).join(', ')}
                     </div>
                   )}
@@ -301,7 +301,7 @@ export default function FunnelResults({ funnels, summary, jobId, jobStatus }: Fu
       </div>
 
       {sorted.length === 0 && (
-        <div className="text-center py-12 text-[var(--text-tertiary)]">
+        <div className="text-center py-12 text-[var(--text-muted)]">
           {jobStatus === 'processing' ? 'Searching for funnels...' : 'No funnels found matching filters'}
         </div>
       )}
