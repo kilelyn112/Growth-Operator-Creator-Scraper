@@ -52,8 +52,8 @@ export default function SignUpPage() {
         throw new Error(data.error || 'Failed to create account');
       }
 
-      // Redirect to main app
-      router.push('/');
+      // Redirect to main app (full page reload to pick up cookie)
+      window.location.href = '/';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create account');
     } finally {

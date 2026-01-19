@@ -31,7 +31,8 @@ export default function LoginPage() {
         throw new Error(data.error || 'Failed to sign in');
       }
 
-      router.push('/');
+      // Full page reload to pick up cookie
+      window.location.href = '/';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in');
     } finally {
