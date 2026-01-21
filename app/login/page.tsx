@@ -52,7 +52,7 @@ export default function LoginPage() {
             <a href="#login" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
               Login
             </a>
-            <Link href="/signup" className="btn-primary text-sm">
+            <Link href="https://www.fanbasis.com/agency-checkout/growthoperator-com/OMMGQ" className="btn-primary text-sm">
               Start Free Trial
             </Link>
           </div>
@@ -70,7 +70,7 @@ export default function LoginPage() {
             Stop scrolling through social media. We scan YouTube, Instagram, and X to find qualified creators with their contact info ready for outreach.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Link href="/signup" className="btn-primary text-lg px-8 py-4">
+            <Link href="https://www.fanbasis.com/agency-checkout/growthoperator-com/OMMGQ" className="btn-primary text-lg px-8 py-4">
               Start 7-Day Free Trial
             </Link>
             <a href="#how-it-works" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-lg">
@@ -297,7 +297,7 @@ export default function LoginPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-[var(--text-secondary)]">
                 New here?{' '}
-                <Link href="/signup" className="text-[var(--accent)] hover:underline font-medium">
+                <Link href="https://www.fanbasis.com/agency-checkout/growthoperator-com/OMMGQ" className="text-[var(--accent)] hover:underline font-medium">
                   Start your free 7-day trial
                 </Link>
               </p>
