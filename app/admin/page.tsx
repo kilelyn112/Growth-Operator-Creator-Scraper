@@ -60,6 +60,34 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [addUserForm, setAddUserForm] = useState({ email: '', firstName: '', password: '', isMember: true });
+  const [addUserLoading, setAddUserLoading] = useState(false);
+  const [addUserError, setAddUserError] = useState<string | null>(null);
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddUserLoading(true);
+    setAddUserError(null);
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addUserForm),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create user');
+      }
+      setShowAddUser(false);
+      setAddUserForm({ email: '', firstName: '', password: '', isMember: true });
+      await fetchUsers();
+    } catch (err) {
+      setAddUserError(err instanceof Error ? err.message : 'Failed to create user');
+    } finally {
+      setAddUserLoading(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -228,6 +256,93 @@ export default function AdminPage() {
               <div className="text-3xl font-bold text-red-600">{stats.expiredTrials}</div>
               <div className="text-sm text-[var(--text-secondary)]">Expired</div>
             </div>
+          </div>
+        )}
+
+        {/* Add User Section */}
+        <div className="mb-6 flex justify-end">
+          <button
+            onClick={() => setShowAddUser(!showAddUser)}
+            className="btn-primary text-sm flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add User
+          </button>
+        </div>
+
+        {showAddUser && (
+          <div className="card p-6 mb-6">
+            <h3 className="font-semibold text-[var(--text-primary)] mb-4">Create New User</h3>
+            {addUserError && (
+              <div className="mb-4 px-4 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                {addUserError}
+              </div>
+            )}
+            <form onSubmit={handleAddUser} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">First Name</label>
+                <input
+                  type="text"
+                  required
+                  value={addUserForm.firstName}
+                  onChange={(e) => setAddUserForm({ ...addUserForm, firstName: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm"
+                  placeholder="First name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={addUserForm.email}
+                  onChange={(e) => setAddUserForm({ ...addUserForm, email: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm"
+                  placeholder="email@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Password</label>
+                <input
+                  type="text"
+                  required
+                  minLength={6}
+                  value={addUserForm.password}
+                  onChange={(e) => setAddUserForm({ ...addUserForm, password: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm"
+                  placeholder="Min 6 characters"
+                />
+              </div>
+              <div className="flex items-end gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={addUserForm.isMember}
+                    onChange={(e) => setAddUserForm({ ...addUserForm, isMember: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                  <span className="text-sm text-[var(--text-secondary)]">Full member access</span>
+                </label>
+              </div>
+              <div className="sm:col-span-2 flex gap-3">
+                <button
+                  type="submit"
+                  disabled={addUserLoading}
+                  className="btn-primary text-sm"
+                >
+                  {addUserLoading ? 'Creating...' : 'Create User'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddUser(false); setAddUserError(null); }}
+                  className="btn-secondary text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
