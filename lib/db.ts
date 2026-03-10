@@ -547,6 +547,189 @@ function normalizeFunnelRow(row: Record<string, unknown>): Funnel {
   };
 }
 
+// ============ EMAIL ACCOUNT OPERATIONS ============
+
+export interface EmailAccountRow {
+  id: number;
+  user_id: number;
+  email_address: string;
+  display_name: string | null;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password_encrypted: string;
+  is_active: boolean;
+  daily_send_limit: number;
+  sends_today: number;
+  sends_reset_at: string | null;
+  last_verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getEmailAccountsByUserId(userId: number): Promise<EmailAccountRow[]> {
+  const { data, error } = await supabase
+    .from('email_accounts')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(`Failed to get email accounts: ${error.message}`);
+  return (data || []) as EmailAccountRow[];
+}
+
+export async function getEmailAccountById(id: number, userId: number): Promise<EmailAccountRow | null> {
+  const { data, error } = await supabase
+    .from('email_accounts')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw new Error(`Failed to get email account: ${error.message}`);
+  }
+  return data as EmailAccountRow;
+}
+
+export async function createEmailAccount(account: {
+  user_id: number;
+  email_address: string;
+  display_name?: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password_encrypted: string;
+}): Promise<EmailAccountRow> {
+  const { data, error } = await supabase
+    .from('email_accounts')
+    .insert({
+      user_id: account.user_id,
+      email_address: account.email_address,
+      display_name: account.display_name || null,
+      smtp_host: account.smtp_host,
+      smtp_port: account.smtp_port,
+      smtp_username: account.smtp_username,
+      smtp_password_encrypted: account.smtp_password_encrypted,
+      is_active: true,
+      daily_send_limit: 50,
+      sends_today: 0,
+      last_verified_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create email account: ${error.message}`);
+  return data as EmailAccountRow;
+}
+
+export async function deleteEmailAccount(id: number, userId: number): Promise<void> {
+  const { error } = await supabase
+    .from('email_accounts')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  if (error) throw new Error(`Failed to delete email account: ${error.message}`);
+}
+
+export async function incrementSendCount(accountId: number): Promise<void> {
+  // Check if sends need to be reset (new day)
+  const account = await supabase
+    .from('email_accounts')
+    .select('sends_today, sends_reset_at')
+    .eq('id', accountId)
+    .single();
+
+  if (account.data) {
+    const resetAt = account.data.sends_reset_at ? new Date(account.data.sends_reset_at) : null;
+    const now = new Date();
+
+    if (!resetAt || now > resetAt) {
+      // Reset counter and set next reset to tomorrow
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+
+      await supabase
+        .from('email_accounts')
+        .update({ sends_today: 1, sends_reset_at: tomorrow.toISOString() })
+        .eq('id', accountId);
+    } else {
+      // Increment counter
+      await supabase
+        .from('email_accounts')
+        .update({ sends_today: (account.data.sends_today || 0) + 1 })
+        .eq('id', accountId);
+    }
+  }
+}
+
+// ============ SENT EMAIL OPERATIONS ============
+
+export interface SentEmailRow {
+  id: number;
+  user_id: number;
+  email_account_id: number;
+  creator_id: number | null;
+  to_email: string;
+  to_name: string | null;
+  subject: string;
+  body_html: string;
+  message_id: string | null;
+  status: string;
+  error: string | null;
+  sent_at: string;
+  created_at: string;
+}
+
+export async function logSentEmail(email: {
+  user_id: number;
+  email_account_id: number;
+  creator_id?: number | null;
+  to_email: string;
+  to_name?: string | null;
+  subject: string;
+  body_html: string;
+  message_id?: string | null;
+  status: string;
+  error?: string | null;
+}): Promise<SentEmailRow> {
+  const { data, error } = await supabase
+    .from('sent_emails')
+    .insert({
+      user_id: email.user_id,
+      email_account_id: email.email_account_id,
+      creator_id: email.creator_id || null,
+      to_email: email.to_email,
+      to_name: email.to_name || null,
+      subject: email.subject,
+      body_html: email.body_html,
+      message_id: email.message_id || null,
+      status: email.status,
+      error: email.error || null,
+      sent_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to log sent email: ${error.message}`);
+  return data as SentEmailRow;
+}
+
+export async function getSentEmailsByUserId(userId: number, limit: number = 50): Promise<SentEmailRow[]> {
+  const { data, error } = await supabase
+    .from('sent_emails')
+    .select('*')
+    .eq('user_id', userId)
+    .order('sent_at', { ascending: false })
+    .limit(limit);
+
+  if (error) return [];
+  return (data || []) as SentEmailRow[];
+}
+
 // ============ STATS ============
 
 export async function getDatabaseStats(): Promise<{ creators: number; funnels: number; jobs: number }> {

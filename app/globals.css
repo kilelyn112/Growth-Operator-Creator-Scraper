@@ -209,7 +209,9 @@ a:hover {
 /* Input Fields */
 input[type="text"],
 input[type="email"],
+input[type="password"],
 input[type="search"],
+select,
 textarea {
   font-family: var(--font-modern);
   background: var(--bg-primary);
@@ -223,14 +225,18 @@ textarea {
 
 input[type="text"]:hover,
 input[type="email"]:hover,
+input[type="password"]:hover,
 input[type="search"]:hover,
+select:hover,
 textarea:hover {
   border-color: var(--border-emphasized);
 }
 
 input[type="text"]:focus,
 input[type="email"]:focus,
+input[type="password"]:focus,
 input[type="search"]:focus,
+select:focus,
 textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-light);
@@ -522,4 +528,150 @@ tbody tr:nth-child(10) { animation-delay: 450ms; }
   background: var(--accent-hover);
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
+}
+
+.btn-accent:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ===== Bulk Outreach Animations ===== */
+
+/* Floating action bar slide up */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+/* Panel slide in from right */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.35s ease-out forwards;
+}
+
+.animate-slideOutRight {
+  animation: slideOutRight 0.25s ease-in forwards;
+}
+
+/* Backdrop fade */
+@keyframes backdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-backdropIn {
+  animation: backdropIn 0.25s ease-out forwards;
+}
+
+/* Stagger fade for list items */
+@keyframes staggerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-staggerFadeIn {
+  animation: staggerFadeIn 0.3s ease-out forwards;
+}
+
+/* Scale pop for success/fail indicators */
+@keyframes scalePop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scalePop {
+  animation: scalePop 0.3s ease-out forwards;
+}
+
+/* Progress bar smooth fill */
+.progress-bar-animated {
+  transition: width 0.5s ease-out;
+}
+
+/* Selected row highlight */
+.row-selected {
+  background: var(--accent-light) !important;
+}
+
+/* Checkbox styles */
+.custom-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-emphasized);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.custom-checkbox:hover {
+  border-color: var(--accent);
+}
+
+.custom-checkbox:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.custom-checkbox:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.custom-checkbox:disabled:hover {
+  border-color: var(--border-emphasized);
 }

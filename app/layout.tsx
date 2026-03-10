@@ -1,22 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
-const geist = Geist({
-  variable: "--font-geist",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
 export const metadata: Metadata = {
-  title: "Creator Hunter",
-  description: "Find qualified creators in your niche for outreach",
+  title: "CreatorPairing",
+  description: "Find qualified creators, send outreach, and build funnels",
 };
 
 export default function RootLayout({
@@ -27,8 +16,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geist.variable} ${geistMono.variable} antialiased`}
-        style={{ fontFamily: 'var(--font-geist), -apple-system, BlinkMacSystemFont, sans-serif' }}
+        className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
+        style={{ fontFamily: 'var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif' }}
       >
         {children}
       </body>

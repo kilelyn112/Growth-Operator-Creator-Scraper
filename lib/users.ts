@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import bcrypt from 'bcryptjs';
+import { scryptSync, randomBytes, timingSafeEqual } from 'crypto';
 
 export interface User {
   id: number;
@@ -25,6 +25,20 @@ const TRIAL_DAYS = 7;
 
 // ============ USER OPERATIONS ============
 
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPasswordHash(password: string, stored: string): boolean {
+  const [salt, hash] = stored.split(':');
+  if (!salt || !hash) return false;
+  const hashBuffer = Buffer.from(hash, 'hex');
+  const derivedKey = scryptSync(password, salt, 64);
+  return timingSafeEqual(hashBuffer, derivedKey);
+}
+
 export async function createUser(input: CreateUserInput): Promise<User> {
   // Check if email already exists
   const existing = await getUserByEmail(input.email);
@@ -33,7 +47,7 @@ export async function createUser(input: CreateUserInput): Promise<User> {
   }
 
   // Hash password
-  const password_hash = await bcrypt.hash(input.password, 10);
+  const password_hash = hashPassword(input.password);
 
   const { data, error } = await supabase
     .from('users')
@@ -92,7 +106,26 @@ export async function verifyPassword(email: string, password: string): Promise<U
 
   if (error || !data) return null;
 
-  const isValid = await bcrypt.compare(password, data.password_hash);
+  // Support both scrypt (salt:hash) and bcrypt ($2b$...) formats
+  let isValid = false;
+  if (data.password_hash.includes(':')) {
+    // Scrypt format
+    isValid = verifyPasswordHash(password, data.password_hash);
+  } else if (data.password_hash.startsWith('$2')) {
+    // Bcrypt format — verify using Python subprocess (bcryptjs broken on Node 24)
+    const { execSync } = require('child_process');
+    try {
+      const pw = Buffer.from(password).toString('base64');
+      const hash = Buffer.from(data.password_hash).toString('base64');
+      const result = execSync(
+        `python3 -c "import bcrypt,base64; pw=base64.b64decode('${pw}'); h=base64.b64decode('${hash}'); print(bcrypt.checkpw(pw, h))"`,
+        { timeout: 5000 }
+      ).toString().trim();
+      isValid = result === 'True';
+    } catch {
+      isValid = false;
+    }
+  }
   if (!isValid) return null;
 
   // Update last login

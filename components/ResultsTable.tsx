@@ -44,6 +44,9 @@ interface ResultsTableProps {
   onFindMore?: () => void;
   isFindingMore?: boolean;
   jobStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onSendEmail?: (creator: any) => void;
+  onBulkOutreach?: (creators: Creator[]) => void;
 }
 
 type SortField = 'displayName' | 'followers' | 'postCount' | 'qualified';
@@ -114,12 +117,13 @@ const PlatformIcon = ({ platform, className = "w-5 h-5" }: { platform: Platform;
   }
 };
 
-export default function ResultsTable({ creators, summary, jobId, platform = 'youtube', onFindMore, isFindingMore, jobStatus }: ResultsTableProps) {
+export default function ResultsTable({ creators, summary, jobId, platform = 'youtube', onFindMore, isFindingMore, jobStatus, onSendEmail, onBulkOutreach }: ResultsTableProps) {
   const [sortField, setSortField] = useState<SortField>('followers');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [filterQualified, setFilterQualified] = useState(true);
   const [visibleRows, setVisibleRows] = useState<Set<number>>(new Set());
   const [showCelebration, setShowCelebration] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const config = PLATFORM_CONFIG[platform];
 
@@ -210,11 +214,11 @@ export default function ResultsTable({ creators, summary, jobId, platform = 'you
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
-      return <span className="text-[var(--text-muted)] ml-1 opacity-50">⇅</span>;
+      return <span className="text-[var(--text-muted)] ml-1 opacity-50">&#8645;</span>;
     }
     return (
       <span className="ml-1 text-[var(--accent)]">
-        {sortDirection === 'asc' ? '↑' : '↓'}
+        {sortDirection === 'asc' ? '\u2191' : '\u2193'}
       </span>
     );
   };
@@ -222,6 +226,42 @@ export default function ResultsTable({ creators, summary, jobId, platform = 'you
   const isGoldMoment = (creator: Creator) => creator.qualified && creator.email;
 
   const getCreatorPlatform = (c: Creator) => c.platform || platform;
+
+  // Selection logic
+  const creatorsWithEmail = sortedCreators.filter(c => c.email);
+  const allEmailSelected = creatorsWithEmail.length > 0 && creatorsWithEmail.every(c => selectedIds.has(c.id));
+  const someSelected = selectedIds.size > 0;
+
+  const handleSelectAll = () => {
+    if (allEmailSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(creatorsWithEmail.map(c => c.id)));
+    }
+  };
+
+  const handleSelectOne = (creator: Creator) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(creator.id)) {
+        next.delete(creator.id);
+      } else {
+        next.add(creator.id);
+      }
+      return next;
+    });
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkOutreach = () => {
+    if (onBulkOutreach) {
+      const selected = creators.filter(c => selectedIds.has(c.id));
+      onBulkOutreach(selected);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -316,6 +356,16 @@ export default function ResultsTable({ creators, summary, jobId, platform = 'you
           <table className="min-w-full">
             <thead>
               <tr className="bg-[var(--bg-subtle)] border-b border-[var(--border-default)]">
+                <th className="px-4 py-4 text-center w-12">
+                  <input
+                    type="checkbox"
+                    className="custom-checkbox"
+                    checked={allEmailSelected}
+                    onChange={handleSelectAll}
+                    disabled={creatorsWithEmail.length === 0}
+                    title={creatorsWithEmail.length === 0 ? 'No creators with emails' : 'Select all with emails'}
+                  />
+                </th>
                 <th onClick={() => handleSort('displayName')} className="px-6 py-4 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--text-primary)] transition-colors">
                   {platform === 'youtube' ? 'Channel' : 'Creator'} <SortIcon field="displayName" />
                 </th>
@@ -332,13 +382,13 @@ export default function ResultsTable({ creators, summary, jobId, platform = 'you
             <tbody>
               {sortedCreators.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center">
+                  <td colSpan={6} className="px-6 py-16 text-center">
                     <div className="text-[var(--text-muted)]">
                       <svg className="w-12 h-12 mx-auto mb-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                       </svg>
                       <div className="font-medium text-lg">No creators match current filters</div>
-                      <div className="text-sm mt-2">Try toggling the "Show qualified only" filter</div>
+                      <div className="text-sm mt-2">Try toggling the &quot;Show qualified only&quot; filter</div>
                     </div>
                   </td>
                 </tr>
@@ -346,6 +396,8 @@ export default function ResultsTable({ creators, summary, jobId, platform = 'you
                 sortedCreators.map((creator, index) => {
                   const gold = isGoldMoment(creator);
                   const isVisible = visibleRows.has(creator.id);
+                  const isSelected = selectedIds.has(creator.id);
+                  const hasEmail = !!creator.email;
 
                   return (
                     <tr
@@ -354,15 +406,27 @@ export default function ResultsTable({ creators, summary, jobId, platform = 'you
                         border-b border-[var(--border-subtle)] last:border-b-0
                         transition-all duration-300 ease-out
                         ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}
-                        ${gold
-                          ? 'bg-gradient-to-r from-[var(--accent-light)] via-emerald-50 to-transparent hover:from-emerald-100'
-                          : 'hover:bg-[var(--bg-subtle)]'
+                        ${isSelected
+                          ? 'row-selected'
+                          : gold
+                            ? 'bg-gradient-to-r from-[var(--accent-light)] via-emerald-50 to-transparent hover:from-emerald-100'
+                            : 'hover:bg-[var(--bg-subtle)]'
                         }
                       `}
                       style={{
                         transitionDelay: `${index * 30}ms`,
                       }}
                     >
+                      <td className="px-4 py-4 text-center w-12">
+                        <input
+                          type="checkbox"
+                          className="custom-checkbox"
+                          checked={isSelected}
+                          onChange={() => handleSelectOne(creator)}
+                          disabled={!hasEmail}
+                          title={hasEmail ? `Select ${getDisplayName(creator)}` : 'No email available'}
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -389,7 +453,7 @@ export default function ResultsTable({ creators, summary, jobId, platform = 'you
                           </div>
                           {gold && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--accent)] text-white text-xs font-medium animate-pulse">
-                              ✨ Hot Lead
+                              &#10024; Hot Lead
                             </span>
                           )}
                         </div>
@@ -404,15 +468,18 @@ export default function ResultsTable({ creators, summary, jobId, platform = 'you
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {creator.email ? (
-                          <a
-                            href={`mailto:${creator.email}`}
-                            className="inline-flex items-center gap-2 text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
-                          >
-                            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                            <span className="font-mono text-sm">{creator.email}</span>
-                          </a>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => onSendEmail && onSendEmail(creator)}
+                              className="inline-flex items-center gap-2 text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors cursor-pointer"
+                              title="Send outreach email"
+                            >
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              <span className="font-mono text-sm">{creator.email}</span>
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-[var(--text-muted)] text-sm">No email found</span>
                         )}
@@ -460,6 +527,42 @@ export default function ResultsTable({ creators, summary, jobId, platform = 'you
           </button>
         )}
       </div>
+
+      {/* Floating Action Bar */}
+      {someSelected && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-slideUp"
+        >
+          <div
+            className="flex items-center gap-6 px-6 py-3.5 rounded-2xl shadow-lg border border-[var(--accent-border)]"
+            style={{
+              background: 'var(--bg-primary)',
+              boxShadow: '0 8px 32px rgba(16, 185, 129, 0.18), 0 2px 8px rgba(0,0,0,0.08)',
+            }}
+          >
+            <span className="text-sm font-medium text-[var(--text-primary)] whitespace-nowrap">
+              <span className="text-[var(--accent)] font-bold">{selectedIds.size}</span> creator{selectedIds.size !== 1 ? 's' : ''} selected
+            </span>
+
+            <button
+              onClick={handleDeselectAll}
+              className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors whitespace-nowrap"
+            >
+              Deselect All
+            </button>
+
+            <button
+              onClick={handleBulkOutreach}
+              className="btn-accent text-sm px-5 py-2 whitespace-nowrap"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+              Send Outreach
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

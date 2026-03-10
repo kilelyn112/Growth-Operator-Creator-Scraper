@@ -7,6 +7,8 @@ import JobStatus from '@/components/JobStatus';
 import ResultsTable from '@/components/ResultsTable';
 import FunnelResults from '@/components/FunnelResults';
 import TrialExpired from '@/components/TrialExpired';
+import SendEmailModal from '@/components/SendEmailModal';
+import BulkOutreachPanel from '@/components/BulkOutreachPanel';
 import { Niche } from '@/lib/niches';
 import { Funnel } from '@/lib/db';
 
@@ -144,6 +146,13 @@ export default function Home() {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('youtube');
   const [maxResults, setMaxResults] = useState(50);
   const [seedAccounts, setSeedAccounts] = useState('');
+
+  // Send Email Modal state
+  const [emailModalCreator, setEmailModalCreator] = useState<Creator | null>(null);
+
+  // Bulk Outreach Panel state
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [bulkOutreachCreators, setBulkOutreachCreators] = useState<any[] | null>(null);
 
   // Funnel Finder state
   const [funnelJobId, setFunnelJobId] = useState<string | null>(null);
@@ -527,6 +536,18 @@ export default function Home() {
               >
                 Funnels
               </button>
+              <a
+                href="/outreach"
+                className="px-4 py-2 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
+              >
+                Outreach
+              </a>
+              <a
+                href="/funnel-builder"
+                className="px-4 py-2 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
+              >
+                Funnel Builder
+              </a>
             </div>
 
             {/* Actions */}
@@ -904,6 +925,8 @@ export default function Home() {
                     onFindMore={handleFindMore}
                     isFindingMore={isFindingMore}
                     jobStatus={job.status}
+                    onSendEmail={(creator) => setEmailModalCreator(creator)}
+                    onBulkOutreach={(selected) => setBulkOutreachCreators(selected)}
                   />
                 )}
 
@@ -920,6 +943,22 @@ export default function Home() {
           </>
         )}
       </main>
+
+      {/* Send Email Modal */}
+      {emailModalCreator && emailModalCreator.email && (
+        <SendEmailModal
+          creator={emailModalCreator}
+          onClose={() => setEmailModalCreator(null)}
+        />
+      )}
+
+      {/* Bulk Outreach Panel */}
+      {bulkOutreachCreators && bulkOutreachCreators.length > 0 && (
+        <BulkOutreachPanel
+          creators={bulkOutreachCreators}
+          onClose={() => setBulkOutreachCreators(null)}
+        />
+      )}
 
       {/* Footer */}
       <footer className="border-t border-[var(--border-default)] mt-auto">
