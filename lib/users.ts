@@ -26,9 +26,15 @@ const TRIAL_DAYS = 7;
 // ============ USER OPERATIONS ============
 
 function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString('hex');
-  const hash = scryptSync(password, salt, 64).toString('hex');
-  return `${salt}:${hash}`;
+  // Try bcryptjs first (works on production), fall back to scrypt (Node 24)
+  try {
+    const bcrypt = require('bcryptjs');
+    return bcrypt.hashSync(password, 10);
+  } catch {
+    const salt = randomBytes(16).toString('hex');
+    const hash = scryptSync(password, salt, 64).toString('hex');
+    return `${salt}:${hash}`;
+  }
 }
 
 function verifyPasswordHash(password: string, stored: string): boolean {
@@ -112,18 +118,25 @@ export async function verifyPassword(email: string, password: string): Promise<U
     // Scrypt format
     isValid = verifyPasswordHash(password, data.password_hash);
   } else if (data.password_hash.startsWith('$2')) {
-    // Bcrypt format — verify using Python subprocess (bcryptjs broken on Node 24)
-    const { execSync } = require('child_process');
+    // Bcrypt format — try bcryptjs first (works on production Node 18/20),
+    // fall back to Python subprocess (for local Node 24 where bcryptjs hangs)
     try {
-      const pw = Buffer.from(password).toString('base64');
-      const hash = Buffer.from(data.password_hash).toString('base64');
-      const result = execSync(
-        `python3 -c "import bcrypt,base64; pw=base64.b64decode('${pw}'); h=base64.b64decode('${hash}'); print(bcrypt.checkpw(pw, h))"`,
-        { timeout: 5000 }
-      ).toString().trim();
-      isValid = result === 'True';
+      const bcrypt = require('bcryptjs');
+      isValid = await bcrypt.compare(password, data.password_hash);
     } catch {
-      isValid = false;
+      // bcryptjs failed (likely Node 24) — try Python fallback
+      try {
+        const { execSync } = require('child_process');
+        const pw = Buffer.from(password).toString('base64');
+        const hash = Buffer.from(data.password_hash).toString('base64');
+        const result = execSync(
+          `python3 -c "import bcrypt,base64; pw=base64.b64decode('${pw}'); h=base64.b64decode('${hash}'); print(bcrypt.checkpw(pw, h))"`,
+          { timeout: 5000 }
+        ).toString().trim();
+        isValid = result === 'True';
+      } catch {
+        isValid = false;
+      }
     }
   }
   if (!isValid) return null;
