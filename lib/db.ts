@@ -321,15 +321,17 @@ export async function findExistingCreatorsByNiche(platform: Platform, niche: str
 }
 
 // FLYWHEEL: Search creators by keyword across multiple fields (main flywheel function)
+// Only returns qualified creators — unqualified/niche-mismatched results are excluded
 export async function searchCreatorsByKeyword(platform: Platform, keyword: string, limit: number = 100): Promise<Creator[]> {
   const searchTerm = `%${keyword.toLowerCase()}%`;
 
-  // Search across multiple relevant fields
+  // Search across multiple relevant fields, only return qualified creators
   const { data, error } = await supabase
     .from('creators')
     .select('*')
     .eq('platform', platform)
-    .or(`niche.ilike.${searchTerm},display_name.ilike.${searchTerm},bio.ilike.${searchTerm},qualification_reason.ilike.${searchTerm}`)
+    .eq('qualified', true)
+    .ilike('niche', searchTerm)
     .order('followers', { ascending: false })
     .limit(limit);
 
@@ -338,6 +340,28 @@ export async function searchCreatorsByKeyword(platform: Platform, keyword: strin
     return [];
   }
   return (data || []).map(c => ({ ...c, qualified: Boolean(c.qualified) })) as Creator[];
+}
+
+// ADMIN: Clear cached creators for a specific niche/keyword and platform
+export async function clearCachedCreators(platform: Platform | 'all', keyword?: string): Promise<number> {
+  let query = supabase.from('creators').delete();
+
+  if (platform !== 'all') {
+    query = query.eq('platform', platform);
+  }
+
+  if (keyword) {
+    query = query.ilike('niche', `%${keyword.toLowerCase()}%`);
+  }
+
+  const { data, error } = await query.select('id');
+
+  if (error) {
+    console.error('Error clearing cached creators:', error);
+    throw new Error('Failed to clear cached creators');
+  }
+
+  return data?.length || 0;
 }
 
 // FLYWHEEL: Get all platform_ids from database to exclude during scraping

@@ -132,7 +132,8 @@ async function processYouTubeJob(
         const qualification = await qualifyCreator(
           channelDetails,
           videos,
-          channel.descriptionLinks
+          channel.descriptionLinks,
+          keyword
         );
 
         console.log(`[${jobId}] ${channel.channelName}: qualified=${qualification.qualified}`);

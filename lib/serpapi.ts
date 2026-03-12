@@ -68,6 +68,7 @@ export interface SerpApiResult {
 
 /**
  * Generate search queries for a niche and platform
+ * Uses a tiered approach: broad queries first, then specific ones
  */
 function generateQueries(keyword: string, platform: 'instagram' | 'x'): string[] {
   const queries: string[] = [];
@@ -76,14 +77,27 @@ function generateQueries(keyword: string, platform: 'instagram' | 'x'): string[]
   // Get niche-specific search terms
   let searchTerms: string[] = [];
   for (const [niche, terms] of Object.entries(NICHE_KEYWORDS)) {
+    if (niche === 'default') continue;
     if (lowerKeyword.includes(niche) || niche.includes(lowerKeyword)) {
       searchTerms.push(...terms);
     }
   }
 
-  // If no specific niche found, use default + the keyword itself
+  // Always include the raw keyword + common coaching variants
+  const keywordVariants = [
+    `${keyword}`,
+    `${keyword} coach`,
+    `${keyword} mentor`,
+    `${keyword} course`,
+    `${keyword} coaching`,
+  ];
+
+  // If no specific niche found, use keyword variants + defaults
   if (searchTerms.length === 0) {
-    searchTerms = [...NICHE_KEYWORDS.default, `${keyword} coach`, `${keyword} mentor`];
+    searchTerms = [...keywordVariants, ...NICHE_KEYWORDS.default];
+  } else {
+    // Prepend keyword variants (they're the most relevant)
+    searchTerms = [...keywordVariants, ...searchTerms];
   }
 
   // Remove duplicates
@@ -94,18 +108,26 @@ function generateQueries(keyword: string, platform: 'instagram' | 'x'): string[]
     ? 'site:instagram.com'
     : 'site:x.com OR site:twitter.com';
 
-  // Generate queries combining search terms with intent signals
-  // Limit to avoid too many API calls
-  const termsToUse = searchTerms.slice(0, 6);
-  const intentsToUse = INTENT_SIGNALS.slice(0, 4);
+  // TIER 1: Broadest queries (just the keyword + site filter, no quotes)
+  // These return the most results and let Google's algo do the matching
+  for (const term of searchTerms.slice(0, 5)) {
+    queries.push(`${term} ${siteFilter}`);
+  }
 
-  for (const term of termsToUse) {
-    // Query with intent signal
-    for (const intent of intentsToUse) {
+  // TIER 2: With a few intent signals (unquoted for flexibility)
+  const lightIntents = ['coaching', 'mentorship', 'work with me', 'DM me'];
+  for (const term of searchTerms.slice(0, 3)) {
+    for (const intent of lightIntents.slice(0, 2)) {
       queries.push(`${term} ${intent} ${siteFilter}`);
     }
-    // Also add query without intent (broader search)
-    queries.push(`${term} ${siteFilter}`);
+  }
+
+  // TIER 3: Quoted intent signals for precision (fewer of these)
+  const preciseIntents = INTENT_SIGNALS.slice(0, 3);
+  for (const term of searchTerms.slice(0, 2)) {
+    for (const intent of preciseIntents) {
+      queries.push(`"${term}" ${intent} ${siteFilter}`);
+    }
   }
 
   return queries;

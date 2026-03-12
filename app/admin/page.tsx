@@ -64,6 +64,10 @@ export default function AdminPage() {
   const [addUserForm, setAddUserForm] = useState({ email: '', firstName: '', password: '', isMember: true });
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [addUserError, setAddUserError] = useState<string | null>(null);
+  const [showClearCache, setShowClearCache] = useState(false);
+  const [cacheForm, setCacheForm] = useState({ keyword: '', platform: 'youtube' });
+  const [cacheLoading, setCacheLoading] = useState(false);
+  const [cacheMessage, setCacheMessage] = useState<string | null>(null);
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,6 +173,32 @@ export default function AdminPage() {
     }
   };
 
+  const handleClearCache = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const desc = cacheForm.keyword
+      ? `"${cacheForm.keyword}" on ${cacheForm.platform}`
+      : `ALL cached creators on ${cacheForm.platform}`;
+    if (!confirm(`Are you sure you want to clear cached results for ${desc}? This will force fresh searches.`)) {
+      return;
+    }
+    setCacheLoading(true);
+    setCacheMessage(null);
+    try {
+      const response = await fetch('/api/admin/cache', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cacheForm),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to clear cache');
+      setCacheMessage(data.message);
+    } catch (err) {
+      setCacheMessage(err instanceof Error ? err.message : 'Failed to clear cache');
+    } finally {
+      setCacheLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
@@ -259,10 +289,19 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Add User Section */}
-        <div className="mb-6 flex justify-end">
+        {/* Action Buttons */}
+        <div className="mb-6 flex justify-end gap-3">
           <button
-            onClick={() => setShowAddUser(!showAddUser)}
+            onClick={() => { setShowClearCache(!showClearCache); setShowAddUser(false); }}
+            className="btn-secondary text-sm flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Clear Search Cache
+          </button>
+          <button
+            onClick={() => { setShowAddUser(!showAddUser); setShowClearCache(false); }}
             className="btn-primary text-sm flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -271,6 +310,59 @@ export default function AdminPage() {
             Add User
           </button>
         </div>
+
+        {showClearCache && (
+          <div className="card p-6 mb-6">
+            <h3 className="font-semibold text-[var(--text-primary)] mb-2">Clear Search Cache</h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">
+              Remove cached creator results so the next search runs fresh with updated AI filtering.
+            </p>
+            {cacheMessage && (
+              <div className="mb-4 px-4 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm">
+                {cacheMessage}
+              </div>
+            )}
+            <form onSubmit={handleClearCache} className="flex items-end gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Niche / Keyword</label>
+                <input
+                  type="text"
+                  value={cacheForm.keyword}
+                  onChange={(e) => setCacheForm({ ...cacheForm, keyword: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm"
+                  placeholder="e.g. amazon fba (leave empty for all)"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Platform</label>
+                <select
+                  value={cacheForm.platform}
+                  onChange={(e) => setCacheForm({ ...cacheForm, platform: e.target.value })}
+                  className="px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm"
+                >
+                  <option value="youtube">YouTube</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="x">X / Twitter</option>
+                  <option value="all">All Platforms</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={cacheLoading}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors whitespace-nowrap"
+              >
+                {cacheLoading ? 'Clearing...' : 'Clear Cache'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowClearCache(false); setCacheMessage(null); }}
+                className="btn-secondary text-sm"
+              >
+                Cancel
+              </button>
+            </form>
+          </div>
+        )}
 
         {showAddUser && (
           <div className="card p-6 mb-6">

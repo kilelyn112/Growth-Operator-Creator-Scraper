@@ -26,7 +26,8 @@ const INSTAGRAM_SYSTEM_PROMPT = `You are a helpful, intelligent assistant that a
 function buildUserPrompt(
   channel: ChannelDetails,
   videos: VideoDetails[],
-  descriptionLinks?: string[]
+  descriptionLinks?: string[],
+  searchKeyword?: string
 ): string {
   const videoExamples = videos
     .slice(0, 10)
@@ -35,11 +36,15 @@ function buildUserPrompt(
     )
     .join('\n\n');
 
-  return `Your task is to analyze YouTube channels and decide if they are qualified leads for my business, and my outreach campaigns.
+  const nicheContext = searchKeyword
+    ? `\n\nIMPORTANT — NICHE RELEVANCE CHECK: The user searched for "${searchKeyword}". This channel MUST be primarily about "${searchKeyword}" or a closely related topic to qualify. A channel that is a coach/educator in a DIFFERENT niche (e.g. dating coach when searching for "amazon fba") is NOT qualified. The channel's main content focus must align with the searched niche.\n`
+    : '';
 
+  return `Your task is to analyze YouTube channels and decide if they are qualified leads for my business, and my outreach campaigns.
+${nicheContext}
 I want you to pay close attention to all sources of information: you will receive the channel's name, about section, video titles, video descriptions (some with links included), and channel's description links.
 
-Use all this information to determine if the youtube channel owner is likely to offer or sell advice, courses, coaching, consulting, communities, or mentorship programs, which would make him qualified.
+Use all this information to determine if the youtube channel owner is likely to offer or sell advice, courses, coaching, consulting, communities, or mentorship programs IN THE NICHE BEING SEARCHED, which would make him qualified.
 
 If you can identify any links in the video descriptions, channel's description links or channel's about section, to Skool, Whop, Patreon, Teachable, Kajabi, or any platform for communities/courses/coaching, that is a strong indicator of qualification (though it is not a strict requirement for qualification).
 
@@ -49,7 +54,7 @@ If you can identify words in the video descriptions, channel's description links
 
 Use the below information for your qualification process:
 
-Channel Name: ${channel.title}
+${searchKeyword ? `SEARCHED NICHE: "${searchKeyword}"\n` : ''}Channel Name: ${channel.title}
 
 Channel About Section: ${channel.description}
 
@@ -63,12 +68,14 @@ ${videoExamples}
 
 Qualification rules:
 
-1. Be opportunity aware — Mark as qualified if there's reasonable evidence the YouTube channel involves someone who offers or sells advice, courses, coaching, communities, consulting, or mentorship. The goal is to find potentially monetized knowledge-based businesses, not to exclude channels and creators just because their offers or links aren't explicit or they don't seem to be actively selling. Also when applicable, feel free to include documentation channels. Channels that share knowledge, insights, or processes should be considered qualified if their content could be monetized or they could potentially sell their expertise.
-2. If the content appears to be in a non-English language, mark it as not qualified. Disqualify the channel if non-English or non-Latin characters appear frequently in the titles, descriptions, or any other section of the channel.
-3. If the channel seems to be primarily from or targeting audiences in developing / third-world countries (e.g. India, Pakistan, Bangladesh, Indonesia, Nigeria, Philippines, etc.), mark it as not qualified. African leads can be accepted.
-4. Focus on creators who seem to target English-speaking business owners or professionals.
-5. Do not disqualify solely due to disclaimers — Ignore phrases like "not financial advice," "for entertainment only," or similar disclaimers. These are common in monetized, educational, or professional niches.
-6. Exclude (mark as not qualified):
+1. NICHE RELEVANCE IS REQUIRED — The channel's PRIMARY content must be about or closely related to "${searchKeyword || 'the searched niche'}". A channel about a completely different topic that happens to mention the keyword once is NOT qualified. For example, if searching for "amazon fba", a dating/lifestyle channel is NOT qualified even if they mentioned Amazon once. The MAJORITY of their content must be relevant to the searched niche.
+2. Be opportunity aware — Mark as qualified if there's reasonable evidence the YouTube channel involves someone who offers or sells advice, courses, coaching, communities, consulting, or mentorship IN THE SEARCHED NICHE. The goal is to find potentially monetized knowledge-based businesses, not to exclude channels and creators just because their offers or links aren't explicit or they don't seem to be actively selling. Also when applicable, feel free to include documentation channels. Channels that share knowledge, insights, or processes should be considered qualified if their content could be monetized or they could potentially sell their expertise.
+3. If the content appears to be in a non-English language, mark it as not qualified. Disqualify the channel if non-English or non-Latin characters appear frequently in the titles, descriptions, or any other section of the channel.
+4. If the channel seems to be primarily from or targeting audiences in developing / third-world countries (e.g. India, Pakistan, Bangladesh, Indonesia, Nigeria, Philippines, etc.), mark it as not qualified. African leads can be accepted.
+5. Focus on creators who seem to target English-speaking business owners or professionals.
+6. Do not disqualify solely due to disclaimers — Ignore phrases like "not financial advice," "for entertainment only," or similar disclaimers. These are common in monetized, educational, or professional niches.
+7. Exclude (mark as not qualified):
+- Channels NOT primarily about "${searchKeyword || 'the searched niche'}" — If the channel's main content focus is a different topic, mark as not qualified even if they are a coach/educator in another niche.
 - Channels that lack focus — If the channel appears to cover many unrelated topics or side hustles (e.g., random money-making ideas), mark as not qualified. Focus on creators with a clear educational niche.
 - Podcast channels.
 - Channels that represent or are centered around large, mainstream business influencer brands. These are creators or organizations with broad mass appeal, high production value, and large established audiences (examples include personalities like Alex Hormozi, Kevin O'Leary, Robert Kiyosaki, Gary Vaynerchuk, etc.)
@@ -77,7 +84,7 @@ Qualification rules:
 
 ---
 
-Return two clean, separate JSON fields - one called "qualified" (true or false) - and one called "reason" (a short explanation with the first thing being, the name of the channel so I can identify who you're talking about).
+Return two clean, separate JSON fields - one called "qualified" (true or false) - and one called "reason" (a short explanation with the first thing being, the name of the channel so I can identify who you're talking about. If not qualified due to niche mismatch, say so clearly.).
 
 Return only valid JSON with two top-level fields:
 
@@ -90,7 +97,8 @@ Return only valid JSON with two top-level fields:
 export async function qualifyCreator(
   channel: ChannelDetails,
   videos: VideoDetails[],
-  descriptionLinks?: string[]
+  descriptionLinks?: string[],
+  searchKeyword?: string
 ): Promise<QualificationResult> {
   try {
     const openai = getOpenAIClient();
@@ -98,7 +106,7 @@ export async function qualifyCreator(
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: YOUTUBE_SYSTEM_PROMPT },
-        { role: 'user', content: buildUserPrompt(channel, videos, descriptionLinks) },
+        { role: 'user', content: buildUserPrompt(channel, videos, descriptionLinks, searchKeyword) },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.3,
@@ -130,15 +138,19 @@ function buildInstagramPrompt(profile: InstagramSearchResult, searchKeyword?: st
     .map((p, i) => `Post ${i + 1}: ${p.caption?.slice(0, 300) || 'No caption'}`)
     .join('\n\n');
 
+  const nicheContext = searchKeyword
+    ? `\nIMPORTANT — NICHE RELEVANCE: The user searched for "${searchKeyword}". This profile MUST be primarily about "${searchKeyword}" or a closely related topic. A creator in a DIFFERENT niche (e.g. dating coach when searching for "amazon fba") is NOT qualified regardless of their following or coaching status.\n`
+    : '';
+
   return `Your task is to analyze Instagram profiles and decide if they are qualified leads for my business and outreach campaigns.
 
-I want to find INDIVIDUAL CREATORS (real people with personal brands) in the business/entrepreneurship space who share knowledge and could potentially offer courses, coaching, communities, or mentorship.
-
+I want to find INDIVIDUAL CREATORS (real people with personal brands) who share knowledge and could potentially offer courses, coaching, communities, or mentorship.
+${nicheContext}
 ---
 
 Use the below information for your qualification process:
 
-Username: @${profile.username}
+${searchKeyword ? `SEARCHED NICHE: "${searchKeyword}"\n` : ''}Username: @${profile.username}
 Full Name: ${profile.fullName || 'N/A'}
 Bio: ${profile.biography || 'N/A'}
 External URL: ${profile.externalUrl || 'N/A'}
@@ -155,24 +167,27 @@ ${recentPostsText || 'No recent posts available'}
 
 Qualification rules:
 
-1. BE OPPORTUNITY AWARE — Mark as QUALIFIED if there's reasonable evidence this is an individual creator who shares business/entrepreneurship knowledge and COULD monetize through education. The goal is to find potential leads, NOT to exclude people just because they don't explicitly say "coach" or "mentor".
+1. NICHE RELEVANCE IS REQUIRED — The creator's PRIMARY focus must be about or closely related to "${searchKeyword || 'the searched niche'}". A creator in a completely different niche is NOT qualified even if they are a successful coach/educator.
 
-2. QUALIFY creators who:
+2. BE OPPORTUNITY AWARE — Mark as QUALIFIED if there's reasonable evidence this is an individual creator who shares knowledge IN THE SEARCHED NICHE and COULD monetize through education. The goal is to find potential leads, NOT to exclude people just because they don't explicitly say "coach" or "mentor".
+
+3. QUALIFY creators who:
    - Are real people (not software tools or company accounts)
-   - Share content about business, ecommerce, dropshipping, Amazon FBA, marketing, making money online, entrepreneurship, or similar topics
+   - Share content about the searched niche or closely related topics
    - Have a personal brand where THEY are the face
    - Could reasonably offer courses, coaching, or communities (even if not explicitly stated)
    - Are successful in their niche (indicators: large following, talks about their results/journey)
 
-3. Strong QUALIFICATION signals (any of these = likely qualified):
+4. Strong QUALIFICATION signals (any of these = likely qualified):
    - Personal name visible (real person)
-   - Talks about their business journey, results, or expertise
-   - Shares tips, advice, or educational content
+   - Talks about their business journey, results, or expertise IN THE SEARCHED NICHE
+   - Shares tips, advice, or educational content relevant to the niche
    - Has links to courses, communities, Skool, Whop, Stan Store, Teachable, etc.
    - Bio mentions helping others, teaching, or transformation
    - Founder/CEO of their own brand who also teaches
 
-4. EXCLUDE (mark as NOT QUALIFIED):
+5. EXCLUDE (mark as NOT QUALIFIED):
+   - Creators whose main focus is a DIFFERENT niche than "${searchKeyword || 'the searched niche'}"
    - SOFTWARE TOOLS / APPS (username contains "app", "software", "tools", "spy", ".io", ".com")
    - Pure brand/product accounts with no personal element
    - Company accounts that aren't personal brands
@@ -182,7 +197,7 @@ Qualification rules:
    - Accounts under 5,000 followers (too small)
    - Podcast channels or interview shows (not personal brands)
 
-5. DO NOT disqualify just because:
+6. DO NOT disqualify just because:
    - They don't explicitly say "coach" or "mentor"
    - They're a founder/CEO (founders can still teach)
    - They focus on their own business success (they can still help others)
@@ -194,7 +209,7 @@ Return only valid JSON:
 
 {
   "qualified": true or false,
-  "reason": "string explaining why - start with the username"
+  "reason": "string explaining why - start with the username. If not qualified due to niche mismatch, say so."
 }`;
 }
 
@@ -251,15 +266,19 @@ const X_SYSTEM_PROMPT = `You are a helpful assistant that analyzes X/Twitter pro
  * Build X/Twitter-specific qualification prompt
  */
 function buildXPrompt(profile: XProfile, searchKeyword?: string): string {
+  const nicheContext = searchKeyword
+    ? `\nIMPORTANT — NICHE RELEVANCE: The user searched for "${searchKeyword}". This profile MUST be primarily about "${searchKeyword}" or a closely related topic to qualify.\n`
+    : '';
+
   return `Your task is to analyze X/Twitter profiles and decide if they are qualified leads for business outreach.
 
-I want to find INDIVIDUAL CREATORS (real people with personal brands) in the business/entrepreneurship space who share knowledge and could potentially offer courses, coaching, communities, or mentorship.
-
+I want to find INDIVIDUAL CREATORS (real people with personal brands) who share knowledge and could potentially offer courses, coaching, communities, or mentorship.
+${nicheContext}
 ---
 
 Profile Information:
 
-Username: @${profile.username}
+${searchKeyword ? `SEARCHED NICHE: "${searchKeyword}"\n` : ''}Username: @${profile.username}
 Display Name: ${profile.displayName}
 Bio/Snippet: ${profile.bio}
 Profile URL: ${profile.url}
@@ -269,21 +288,24 @@ Search Query that found them: ${profile.sourceQuery}
 
 Qualification rules:
 
-1. BE OPPORTUNITY AWARE — Mark as QUALIFIED if there's reasonable evidence this is an individual creator who shares business/entrepreneurship knowledge and COULD monetize through education.
+1. NICHE RELEVANCE IS REQUIRED — The creator's primary focus must be about or closely related to "${searchKeyword || 'the searched niche'}". A creator in a different niche is NOT qualified.
 
-2. QUALIFY creators who:
+2. BE OPPORTUNITY AWARE — Mark as QUALIFIED if there's reasonable evidence this is an individual creator who shares knowledge IN THE SEARCHED NICHE and COULD monetize through education.
+
+3. QUALIFY creators who:
    - Are real people (not software tools or company accounts)
-   - Share content about business, ecommerce, marketing, making money, entrepreneurship
+   - Share content about the searched niche or closely related topics
    - Have coaching/educational language in their bio (coach, mentor, I help, learn, etc.)
    - Could reasonably offer courses, coaching, or communities
 
-3. Strong QUALIFICATION signals:
+4. Strong QUALIFICATION signals:
    - Personal name visible
-   - Bio mentions helping others, teaching, or coaching
+   - Bio mentions helping others, teaching, or coaching IN THE SEARCHED NICHE
    - Language like "book a call", "coaching", "mentorship", "apply now"
-   - Talks about their expertise or results
+   - Talks about their expertise or results in the niche
 
-4. EXCLUDE (mark as NOT QUALIFIED):
+5. EXCLUDE (mark as NOT QUALIFIED):
+   - Creators whose main focus is a DIFFERENT niche than "${searchKeyword || 'the searched niche'}"
    - SOFTWARE TOOLS / APPS / BOTS
    - Company/brand accounts (not personal brands)
    - News/media accounts
@@ -296,7 +318,7 @@ Return only valid JSON:
 
 {
   "qualified": true or false,
-  "reason": "string explaining why - start with the username"
+  "reason": "string explaining why - start with the username. If niche mismatch, say so."
 }`;
 }
 
