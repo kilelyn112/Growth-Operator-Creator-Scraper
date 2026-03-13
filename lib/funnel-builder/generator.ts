@@ -1,8 +1,8 @@
 /**
- * Funnel Generator — Takes a CreatorAnalysis and generates a complete funnel
+ * Funnel Generator — Generates call booking / application funnel outlines
  *
- * NOTE: This uses a default marketing prompt. The user will provide custom
- * marketing psychology prompts to replace/enhance this.
+ * Structure: Headline → Subheadline → Video placeholder → Apply CTA →
+ * Who this is for → Social proof → Application form → About → Final CTA
  */
 
 import OpenAI from 'openai';
@@ -25,63 +25,60 @@ export interface GeneratedFunnel {
   // Funnel sections
   headline: string;
   subheadline: string;
-  hero_section: {
-    hook_text: string;
-    cta_text: string;
-    cta_subtext: string;
+  hero_cta_text: string;
+  hero_cta_subtext: string;
+  video_section: {
+    pre_video_text: string;
+    post_video_text: string;
   };
-  pain_points: {
+  who_this_is_for: {
     section_title: string;
-    points: { title: string; description: string }[];
-  };
-  solution: {
-    title: string;
-    description: string;
-    bullet_points: string[];
+    qualifiers: string[];
+    disqualifiers: string[];
   };
   social_proof: {
     section_title: string;
     testimonials: { name: string; result: string; quote: string }[];
   };
-  offer: {
-    title: string;
-    description: string;
-    features: { name: string; description: string }[];
-    price_anchor: string;
-    actual_price: string;
-    cta_text: string;
-    urgency_text: string;
+  application: {
+    section_title: string;
+    section_description: string;
+    fields: { label: string; type: 'text' | 'email' | 'phone' | 'select' | 'textarea'; placeholder: string; options?: string[] }[];
+    submit_text: string;
   };
   about_section: {
     title: string;
     bio: string;
     credentials: string[];
   };
-  faq: { question: string; answer: string }[];
   final_cta: {
     headline: string;
     subheadline: string;
     cta_text: string;
-    guarantee_text: string;
   };
 }
 
-// ============================================================
-// DEFAULT FUNNEL GENERATION PROMPT
-// This will be replaced/enhanced with the user's custom prompts
-// ============================================================
+const FUNNEL_SYSTEM_PROMPT = `You are an elite funnel architect who builds high-converting call booking / application funnels. NOT course sales pages. NOT product pages.
 
-const FUNNEL_SYSTEM_PROMPT = `You are an elite direct response copywriter and funnel architect. You create high-converting sales funnels that combine proven marketing psychology with specific creator insights.
+You build funnels that get prospects to APPLY and BOOK A CALL. The structure is simple and proven:
+- Strong qualifying headline
+- Short VSL / video section
+- "Apply Now" CTA
+- Who this is for (qualify the prospect)
+- Social proof / results
+- Short application form
+- About the mentor
+- Final CTA
 
-Your funnels follow these principles:
-- Lead with the transformation, not features
-- Use specific, concrete language (not generic marketing fluff)
-- Match the creator's voice and tone
-- Address objections before they arise
-- Create urgency without being sleazy
-- Every section has ONE job: get them to the next section
+Your copy is:
+- Direct and confident, not salesy or hype-y
+- Qualifying — makes the prospect feel like THEY need to earn the spot
+- Specific to the creator's niche and voice
+- Focused on results and transformation, not features
 
-Return structured JSON for each funnel section.`;
+NEVER include pricing, course features, "enroll now", money-back guarantees, or product sales language. This is a CALL FUNNEL.
+
+Return structured JSON.`;
 
 export async function generateFunnel(
   analysis: CreatorAnalysis,
@@ -115,7 +112,7 @@ export async function generateFunnel(
 }
 
 function buildFunnelPrompt(analysis: CreatorAnalysis, targetPlatform: string): string {
-  return `Build a complete high-converting sales funnel for this creator. Use their specific content, niche, and audience insights to make every word specific to THEM — not generic.
+  return `Build a complete CALL BOOKING / APPLICATION FUNNEL for this creator. This is NOT a course sales page. The goal is to get qualified prospects to apply and book a call.
 
 ## CREATOR ANALYSIS
 
@@ -149,133 +146,139 @@ Target Platform: ${targetPlatform}
 
 ---
 
-Generate a complete funnel with these sections. Every piece of copy should be SPECIFIC to this creator — use their niche language, reference their content themes, and match their tone.
+Generate a call funnel with these sections. Every piece of copy should be SPECIFIC to this creator. Match their tone and use their niche language.
 
 Return JSON:
 
 {
-  "headline": "The main headline — should communicate the #1 transformation. Use power words from their niche.",
-  "subheadline": "Supporting line that adds specificity and credibility",
-  "hero_section": {
-    "hook_text": "2-3 sentences that immediately grab attention by calling out the audience's biggest frustration",
-    "cta_text": "Primary CTA button text",
-    "cta_subtext": "Text below the button (e.g., 'Join 5,000+ students' or 'Limited spots available')"
+  "headline": "The main qualifying headline — should call out who this is for and hint at the transformation. Example tone: 'Want to scale your Amazon FBA business to 7 figures?' or 'Ready to build a real estate portfolio that replaces your income?'",
+  "subheadline": "Supporting line — adds credibility or specificity. Example: 'Learn the exact system I used to generate $2M in revenue'",
+  "hero_cta_text": "Primary CTA button text (e.g., 'Apply Now', 'Book Your Free Call', 'See If You Qualify')",
+  "hero_cta_subtext": "Text below the button (e.g., 'Limited spots available' or 'Free strategy session')",
+  "video_section": {
+    "pre_video_text": "Short text above the video placeholder (e.g., 'Watch this short video to see if this is right for you')",
+    "post_video_text": "Text below the video pushing them to apply (e.g., 'If this resonated with you, apply below')"
   },
-  "pain_points": {
-    "section_title": "A headline for the pain section (e.g., 'Sound familiar?')",
-    "points": [
-      { "title": "Pain point title", "description": "1-2 sentences elaborating on this specific pain" }
-    ]
-  },
-  "solution": {
-    "title": "The solution section headline",
-    "description": "2-3 sentences introducing their solution/offer",
-    "bullet_points": ["6-8 specific benefits/outcomes using their niche language"]
+  "who_this_is_for": {
+    "section_title": "Section headline (e.g., 'This Is For You If...')",
+    "qualifiers": ["5-6 qualifying statements that describe their ideal client. Start each with 'You...' — e.g., 'You're already making $5K/month and want to scale'"],
+    "disqualifiers": ["3-4 disqualifying statements. Start each with 'This is NOT for you if...' — e.g., 'This is NOT for you if you're looking for a get-rich-quick scheme'"]
   },
   "social_proof": {
-    "section_title": "Social proof section headline",
+    "section_title": "Social proof headline (e.g., 'Results From Our Clients')",
     "testimonials": [
-      { "name": "Realistic first name", "result": "Specific result achieved", "quote": "A realistic testimonial quote" }
+      { "name": "Realistic first name", "result": "Specific measurable result (e.g., 'Went from $3K to $15K/month in 90 days')", "quote": "A short realistic quote about their experience" }
     ]
   },
-  "offer": {
-    "title": "What's included headline",
-    "description": "Overview of the offer",
-    "features": [
-      { "name": "Feature name", "description": "What it includes and why it matters" }
+  "application": {
+    "section_title": "Application section headline (e.g., 'Apply For Your Free Strategy Call')",
+    "section_description": "1-2 sentences explaining what happens after they apply (e.g., 'Fill out the short application below and if you qualify, we will reach out to schedule your free strategy call.')",
+    "fields": [
+      { "label": "Full Name", "type": "text", "placeholder": "Your full name" },
+      { "label": "Email", "type": "email", "placeholder": "your@email.com" },
+      { "label": "Phone Number", "type": "phone", "placeholder": "(555) 000-0000" },
+      { "label": "A qualifying question specific to their niche", "type": "select", "placeholder": "Select one", "options": ["Option 1", "Option 2", "Option 3", "Option 4"] },
+      { "label": "Another qualifying question", "type": "textarea", "placeholder": "Tell us about..." }
     ],
-    "price_anchor": "Higher perceived value (e.g., 'Value: $4,997')",
-    "actual_price": "The actual price or CTA (e.g., 'Today: $997' or 'Book a Free Call')",
-    "cta_text": "CTA button text for the offer section",
-    "urgency_text": "Urgency/scarcity element"
+    "submit_text": "Submit Application"
   },
   "about_section": {
-    "title": "About section headline",
-    "bio": "3-4 sentences written in first person AS the creator, highlighting their journey and why they teach",
+    "title": "About section headline (e.g., 'Who Is [Name]?')",
+    "bio": "3-4 sentences written in third person about the creator — their journey, results, and why they mentor",
     "credentials": ["4-5 specific credentials or proof points"]
   },
-  "faq": [
-    { "question": "Common objection phrased as question", "answer": "Answer that overcomes the objection" }
-  ],
   "final_cta": {
-    "headline": "Final urgency headline",
-    "subheadline": "Last chance messaging",
-    "cta_text": "Final CTA button text",
-    "guarantee_text": "Risk reversal (e.g., '30-day money back guarantee')"
+    "headline": "Final push headline (e.g., 'Ready To Take The Next Step?')",
+    "subheadline": "Final supporting line creating urgency without being sleazy",
+    "cta_text": "Final CTA button text (e.g., 'Apply Now')"
   }
 }
 
-Generate 4 pain points, 3 testimonials, 5-6 offer features, and 5 FAQs.`;
+Generate 3 testimonials and 5 application form fields (including 1-2 qualifying questions specific to their niche as select or textarea fields).`;
 }
 
 /**
- * Export funnel as copy-pasteable HTML sections
+ * Export funnel as copy-pasteable HTML
  */
 export function exportFunnelAsHTML(funnel: GeneratedFunnel): string {
   return `<!-- ==========================================
-     FUNNEL FOR: ${funnel.creator_name}
+     CALL FUNNEL FOR: ${funnel.creator_name}
      NICHE: ${funnel.niche}
      Generated by CreatorPairing.com
      ========================================== -->
 
 <!-- HERO SECTION -->
-<section class="hero">
+<section class="hero" style="text-align:center; padding:60px 20px;">
   <h1>${escapeHtml(funnel.headline)}</h1>
   <h2>${escapeHtml(funnel.subheadline)}</h2>
-  <p>${escapeHtml(funnel.hero_section.hook_text)}</p>
-  <a href="#offer" class="cta-button">${escapeHtml(funnel.hero_section.cta_text)}</a>
-  <p class="cta-subtext">${escapeHtml(funnel.hero_section.cta_subtext)}</p>
+  <a href="#application" class="cta-button">${escapeHtml(funnel.hero_cta_text)}</a>
+  <p class="cta-subtext">${escapeHtml(funnel.hero_cta_subtext)}</p>
 </section>
 
-<!-- PAIN POINTS -->
-<section class="pain-points">
-  <h2>${escapeHtml(funnel.pain_points.section_title)}</h2>
-  ${funnel.pain_points.points.map(p => `
-  <div class="pain-point">
-    <h3>${escapeHtml(p.title)}</h3>
-    <p>${escapeHtml(p.description)}</p>
-  </div>`).join('')}
+<!-- VIDEO SECTION -->
+<section class="video-section" style="text-align:center; padding:40px 20px;">
+  <p>${escapeHtml(funnel.video_section.pre_video_text)}</p>
+  <div class="video-placeholder" style="max-width:640px; margin:20px auto; background:#000; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; border-radius:8px;">
+    <span style="color:#fff; font-size:48px;">&#9654;</span>
+  </div>
+  <p>${escapeHtml(funnel.video_section.post_video_text)}</p>
+  <a href="#application" class="cta-button">${escapeHtml(funnel.hero_cta_text)}</a>
 </section>
 
-<!-- SOLUTION -->
-<section class="solution">
-  <h2>${escapeHtml(funnel.solution.title)}</h2>
-  <p>${escapeHtml(funnel.solution.description)}</p>
-  <ul>
-    ${funnel.solution.bullet_points.map(bp => `<li>${escapeHtml(bp)}</li>`).join('\n    ')}
+<!-- WHO THIS IS FOR -->
+<section class="qualifiers" style="padding:40px 20px;">
+  <h2>${escapeHtml(funnel.who_this_is_for.section_title)}</h2>
+  <ul class="qualifier-list">
+    ${funnel.who_this_is_for.qualifiers.map(q => `<li>&#10003; ${escapeHtml(q)}</li>`).join('\n    ')}
   </ul>
+  ${funnel.who_this_is_for.disqualifiers.length > 0 ? `<ul class="disqualifier-list">
+    ${funnel.who_this_is_for.disqualifiers.map(d => `<li>&#10007; ${escapeHtml(d)}</li>`).join('\n    ')}
+  </ul>` : ''}
 </section>
 
 <!-- SOCIAL PROOF -->
-<section class="testimonials">
+<section class="testimonials" style="padding:40px 20px;">
   <h2>${escapeHtml(funnel.social_proof.section_title)}</h2>
   ${funnel.social_proof.testimonials.map(t => `
   <div class="testimonial">
-    <p class="quote">"${escapeHtml(t.quote)}"</p>
-    <p class="author">— ${escapeHtml(t.name)}</p>
+    <p class="quote">&ldquo;${escapeHtml(t.quote)}&rdquo;</p>
+    <p class="author">&mdash; ${escapeHtml(t.name)}</p>
     <p class="result">${escapeHtml(t.result)}</p>
   </div>`).join('')}
 </section>
 
-<!-- OFFER -->
-<section id="offer" class="offer">
-  <h2>${escapeHtml(funnel.offer.title)}</h2>
-  <p>${escapeHtml(funnel.offer.description)}</p>
-  ${funnel.offer.features.map(f => `
-  <div class="feature">
-    <h3>${escapeHtml(f.name)}</h3>
-    <p>${escapeHtml(f.description)}</p>
-  </div>`).join('')}
-  <div class="pricing">
-    <p class="anchor">${escapeHtml(funnel.offer.price_anchor)}</p>
-    <p class="price">${escapeHtml(funnel.offer.actual_price)}</p>
-  </div>
-  <a href="#" class="cta-button">${escapeHtml(funnel.offer.cta_text)}</a>
-  <p class="urgency">${escapeHtml(funnel.offer.urgency_text)}</p>
+<!-- APPLICATION FORM -->
+<section id="application" class="application" style="padding:40px 20px;">
+  <h2>${escapeHtml(funnel.application.section_title)}</h2>
+  <p>${escapeHtml(funnel.application.section_description)}</p>
+  <form class="application-form" style="max-width:500px; margin:0 auto;">
+    ${funnel.application.fields.map(f => {
+      if (f.type === 'select' && f.options) {
+        return `<div class="form-group">
+      <label>${escapeHtml(f.label)}</label>
+      <select>
+        <option value="">${escapeHtml(f.placeholder)}</option>
+        ${f.options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('\n        ')}
+      </select>
+    </div>`;
+      }
+      if (f.type === 'textarea') {
+        return `<div class="form-group">
+      <label>${escapeHtml(f.label)}</label>
+      <textarea placeholder="${escapeHtml(f.placeholder)}" rows="3"></textarea>
+    </div>`;
+      }
+      return `<div class="form-group">
+      <label>${escapeHtml(f.label)}</label>
+      <input type="${f.type}" placeholder="${escapeHtml(f.placeholder)}" />
+    </div>`;
+    }).join('\n    ')}
+    <button type="submit" class="cta-button">${escapeHtml(funnel.application.submit_text)}</button>
+  </form>
 </section>
 
 <!-- ABOUT -->
-<section class="about">
+<section class="about" style="padding:40px 20px;">
   <h2>${escapeHtml(funnel.about_section.title)}</h2>
   <p>${escapeHtml(funnel.about_section.bio)}</p>
   <ul>
@@ -283,22 +286,11 @@ export function exportFunnelAsHTML(funnel: GeneratedFunnel): string {
   </ul>
 </section>
 
-<!-- FAQ -->
-<section class="faq">
-  <h2>Frequently Asked Questions</h2>
-  ${funnel.faq.map(f => `
-  <div class="faq-item">
-    <h3>${escapeHtml(f.question)}</h3>
-    <p>${escapeHtml(f.answer)}</p>
-  </div>`).join('')}
-</section>
-
 <!-- FINAL CTA -->
-<section class="final-cta">
+<section class="final-cta" style="text-align:center; padding:60px 20px;">
   <h2>${escapeHtml(funnel.final_cta.headline)}</h2>
   <p>${escapeHtml(funnel.final_cta.subheadline)}</p>
-  <a href="#" class="cta-button">${escapeHtml(funnel.final_cta.cta_text)}</a>
-  <p class="guarantee">${escapeHtml(funnel.final_cta.guarantee_text)}</p>
+  <a href="#application" class="cta-button">${escapeHtml(funnel.final_cta.cta_text)}</a>
 </section>`;
 }
 

@@ -30,14 +30,14 @@ interface GeneratedFunnel {
   target_platform: string;
   headline: string;
   subheadline: string;
-  hero_section: { hook_text: string; cta_text: string; cta_subtext: string };
-  pain_points: { section_title: string; points: { title: string; description: string }[] };
-  solution: { title: string; description: string; bullet_points: string[] };
+  hero_cta_text: string;
+  hero_cta_subtext: string;
+  video_section: { pre_video_text: string; post_video_text: string };
+  who_this_is_for: { section_title: string; qualifiers: string[]; disqualifiers: string[] };
   social_proof: { section_title: string; testimonials: { name: string; result: string; quote: string }[] };
-  offer: { title: string; description: string; features: { name: string; description: string }[]; price_anchor: string; actual_price: string; cta_text: string; urgency_text: string };
+  application: { section_title: string; section_description: string; fields: { label: string; type: string; placeholder: string; options?: string[] }[]; submit_text: string };
   about_section: { title: string; bio: string; credentials: string[] };
-  faq: { question: string; answer: string }[];
-  final_cta: { headline: string; subheadline: string; cta_text: string; guarantee_text: string };
+  final_cta: { headline: string; subheadline: string; cta_text: string };
 }
 
 type Step = 'input' | 'analyzing' | 'review' | 'generating' | 'result';
@@ -186,7 +186,7 @@ export default function FunnelBuilderPage() {
                 Build a Funnel for Any Creator
               </h2>
               <p className="text-[var(--text-secondary)]">
-                Paste a YouTube or Instagram URL — we&apos;ll analyze their content and generate a complete sales funnel
+                Paste a YouTube or Instagram URL — we&apos;ll analyze their content and generate a call booking funnel
               </p>
             </div>
 
@@ -413,41 +413,52 @@ export default function FunnelBuilderPage() {
               <div className="card p-8 text-center bg-gradient-to-b from-[var(--bg-subtle)] to-[var(--bg-primary)]">
                 <span className="badge badge-accent mb-4">HERO SECTION</span>
                 <h1 className="font-fancy text-3xl font-bold text-[var(--text-primary)] mb-3">{funnel.headline}</h1>
-                <h2 className="text-lg text-[var(--text-secondary)] mb-4">{funnel.subheadline}</h2>
-                <p className="text-[var(--text-tertiary)] max-w-lg mx-auto mb-6">{funnel.hero_section.hook_text}</p>
+                <h2 className="text-lg text-[var(--text-secondary)] mb-6">{funnel.subheadline}</h2>
                 <div className="inline-block bg-[var(--accent)] text-white px-8 py-3 rounded-lg font-medium">
-                  {funnel.hero_section.cta_text}
+                  {funnel.hero_cta_text}
                 </div>
-                <p className="text-xs text-[var(--text-muted)] mt-2">{funnel.hero_section.cta_subtext}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-2">{funnel.hero_cta_subtext}</p>
               </div>
 
-              {/* Pain Points */}
-              <div className="card p-6">
-                <span className="badge badge-error mb-3">PAIN POINTS</span>
-                <h3 className="font-fancy text-xl font-semibold text-[var(--text-primary)] mb-4">{funnel.pain_points.section_title}</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {funnel.pain_points.points.map((p, i) => (
-                    <div key={i} className="p-4 bg-[var(--status-error-light)] rounded-lg">
-                      <h4 className="font-medium text-[var(--text-primary)] mb-1">{p.title}</h4>
-                      <p className="text-sm text-[var(--text-secondary)]">{p.description}</p>
-                    </div>
-                  ))}
+              {/* Video Section */}
+              <div className="card p-6 text-center">
+                <span className="badge bg-[var(--bg-subtle)] text-[var(--text-primary)] mb-3">VIDEO SECTION</span>
+                <p className="text-[var(--text-secondary)] mb-4">{funnel.video_section.pre_video_text}</p>
+                <div className="max-w-lg mx-auto bg-black rounded-lg flex items-center justify-center" style={{ aspectRatio: '16/9' }}>
+                  <span className="text-white text-5xl">&#9654;</span>
+                </div>
+                <p className="text-[var(--text-secondary)] mt-4">{funnel.video_section.post_video_text}</p>
+                <div className="inline-block bg-[var(--accent)] text-white px-8 py-3 rounded-lg font-medium mt-4">
+                  {funnel.hero_cta_text}
                 </div>
               </div>
 
-              {/* Solution */}
+              {/* Who This Is For */}
               <div className="card p-6">
-                <span className="badge badge-success mb-3">SOLUTION</span>
-                <h3 className="font-fancy text-xl font-semibold text-[var(--text-primary)] mb-2">{funnel.solution.title}</h3>
-                <p className="text-[var(--text-secondary)] mb-4">{funnel.solution.description}</p>
-                <ul className="space-y-2">
-                  {funnel.solution.bullet_points.map((bp, i) => (
-                    <li key={i} className="flex gap-2 text-sm">
-                      <span className="text-[var(--accent)] font-bold">✓</span>
-                      <span className="text-[var(--text-primary)]">{bp}</span>
-                    </li>
-                  ))}
-                </ul>
+                <span className="badge badge-success mb-3">WHO THIS IS FOR</span>
+                <h3 className="font-fancy text-xl font-semibold text-[var(--text-primary)] mb-4">{funnel.who_this_is_for.section_title}</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-sm font-semibold text-[var(--accent)] uppercase tracking-wider mb-3">Qualifiers</h4>
+                    <ul className="space-y-2">
+                      {funnel.who_this_is_for.qualifiers.map((q, i) => (
+                        <li key={i} className="flex gap-2 text-sm text-[var(--text-primary)]">
+                          <span className="text-[var(--accent)] font-bold mt-0.5">&#10003;</span>{q}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[var(--status-error)] uppercase tracking-wider mb-3">Disqualifiers</h4>
+                    <ul className="space-y-2">
+                      {funnel.who_this_is_for.disqualifiers.map((d, i) => (
+                        <li key={i} className="flex gap-2 text-sm text-[var(--text-primary)]">
+                          <span className="text-[var(--status-error)] font-bold mt-0.5">&#10007;</span>{d}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
 
               {/* Social Proof */}
@@ -458,36 +469,49 @@ export default function FunnelBuilderPage() {
                   {funnel.social_proof.testimonials.map((t, i) => (
                     <div key={i} className="p-4 bg-[var(--bg-subtle)] rounded-lg">
                       <p className="text-sm text-[var(--text-primary)] italic mb-3">&ldquo;{t.quote}&rdquo;</p>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">— {t.name}</p>
-                      <p className="text-xs text-[var(--accent)]">{t.result}</p>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">&mdash; {t.name}</p>
+                      <p className="text-xs text-[var(--accent)] mt-1">{t.result}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Offer */}
+              {/* Application Form */}
               <div className="card p-6 border-2 border-[var(--accent-border)]">
-                <span className="badge badge-accent mb-3">OFFER</span>
-                <h3 className="font-fancy text-xl font-semibold text-[var(--text-primary)] mb-2">{funnel.offer.title}</h3>
-                <p className="text-[var(--text-secondary)] mb-4">{funnel.offer.description}</p>
-                <div className="space-y-3 mb-6">
-                  {funnel.offer.features.map((f, i) => (
-                    <div key={i} className="flex gap-3">
-                      <span className="text-[var(--accent)] font-bold mt-0.5">✓</span>
-                      <div>
-                        <span className="font-medium text-[var(--text-primary)]">{f.name}</span>
-                        <span className="text-[var(--text-secondary)]"> — {f.description}</span>
-                      </div>
+                <span className="badge badge-accent mb-3">APPLICATION FORM</span>
+                <h3 className="font-fancy text-xl font-semibold text-[var(--text-primary)] mb-2">{funnel.application.section_title}</h3>
+                <p className="text-[var(--text-secondary)] mb-6">{funnel.application.section_description}</p>
+                <div className="max-w-md mx-auto space-y-4">
+                  {funnel.application.fields.map((f, i) => (
+                    <div key={i}>
+                      <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">{f.label}</label>
+                      {f.type === 'select' && f.options ? (
+                        <select className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-secondary)] text-sm">
+                          <option>{f.placeholder}</option>
+                          {f.options.map((o, j) => (
+                            <option key={j}>{o}</option>
+                          ))}
+                        </select>
+                      ) : f.type === 'textarea' ? (
+                        <textarea
+                          placeholder={f.placeholder}
+                          rows={3}
+                          className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-sm placeholder:text-[var(--text-muted)]"
+                          readOnly
+                        />
+                      ) : (
+                        <input
+                          type={f.type}
+                          placeholder={f.placeholder}
+                          className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-sm placeholder:text-[var(--text-muted)]"
+                          readOnly
+                        />
+                      )}
                     </div>
                   ))}
-                </div>
-                <div className="text-center py-4">
-                  <p className="text-[var(--text-muted)] line-through">{funnel.offer.price_anchor}</p>
-                  <p className="text-2xl font-bold text-[var(--accent)]">{funnel.offer.actual_price}</p>
-                  <div className="inline-block bg-[var(--accent)] text-white px-8 py-3 rounded-lg font-medium mt-3">
-                    {funnel.offer.cta_text}
+                  <div className="inline-block bg-[var(--accent)] text-white px-8 py-3 rounded-lg font-medium w-full text-center mt-2">
+                    {funnel.application.submit_text}
                   </div>
-                  <p className="text-sm text-[var(--status-warning)] mt-2 font-medium">{funnel.offer.urgency_text}</p>
                 </div>
               </div>
 
@@ -503,19 +527,6 @@ export default function FunnelBuilderPage() {
                 </div>
               </div>
 
-              {/* FAQ */}
-              <div className="card p-6">
-                <span className="badge bg-[var(--bg-subtle)] text-[var(--text-primary)] mb-3">FAQ</span>
-                <div className="space-y-4">
-                  {funnel.faq.map((f, i) => (
-                    <div key={i} className="border-b border-[var(--border-subtle)] pb-4 last:border-b-0">
-                      <h4 className="font-medium text-[var(--text-primary)] mb-1">{f.question}</h4>
-                      <p className="text-sm text-[var(--text-secondary)]">{f.answer}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Final CTA */}
               <div className="card p-8 text-center bg-[var(--text-primary)] text-white">
                 <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-xs uppercase tracking-wider mb-4">FINAL CTA</span>
@@ -524,7 +535,6 @@ export default function FunnelBuilderPage() {
                 <div className="inline-block bg-[var(--accent)] text-white px-8 py-3 rounded-lg font-medium">
                   {funnel.final_cta.cta_text}
                 </div>
-                <p className="text-white/50 text-sm mt-3">{funnel.final_cta.guarantee_text}</p>
               </div>
             </div>
 
