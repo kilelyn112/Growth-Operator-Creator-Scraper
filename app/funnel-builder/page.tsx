@@ -411,17 +411,13 @@ export default function FunnelBuilderPage() {
             {/* ====== FUNNEL PREVIEW ====== */}
             <div className="rounded-xl overflow-hidden border border-[var(--border-default)] shadow-lg bg-white">
 
-              {/* Hero — headline + subheadline + CTA */}
-              <div className="text-center px-6 pt-14 pb-10">
+              {/* Hero — headline + subheadline only */}
+              <div className="text-center px-6 pt-14 pb-8">
                 <div className="max-w-2xl mx-auto">
                   <h1 className="text-3xl md:text-[2.7rem] font-black text-black leading-tight mb-4" style={{ fontFamily: "'Poppins', 'Montserrat', sans-serif" }}>
                     {funnel.headline}
                   </h1>
-                  <p className="text-base md:text-lg text-gray-500 mb-2">{funnel.subheadline}</p>
-                  <p className="text-sm text-gray-400 mb-8">{funnel.hero_cta_subtext}</p>
-                  <a href="#funnel-application" className="inline-block bg-[#7ed956] hover:brightness-110 text-white text-xl font-bold px-10 py-4 rounded-lg transition-all" style={{ boxShadow: '0 8px 24px -8px rgba(126,217,86,0.5)' }}>
-                    {funnel.hero_cta_text}
-                  </a>
+                  <p className="text-base md:text-lg text-gray-500">{funnel.subheadline}</p>
                 </div>
               </div>
 

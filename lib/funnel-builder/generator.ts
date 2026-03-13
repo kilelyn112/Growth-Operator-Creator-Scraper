@@ -230,11 +230,9 @@ export function exportFunnelAsHTML(funnel: GeneratedFunnel): string {
 
 <div class="funnel-page">
   <!-- HERO -->
-  <div class="funnel-section" style="padding-top:56px; padding-bottom:32px;">
+  <div class="funnel-section" style="padding-top:56px; padding-bottom:24px;">
     <h1>${escapeHtml(funnel.headline)}</h1>
     <p style="font-size:1.1rem;">${escapeHtml(funnel.subheadline)}</p>
-    <p style="font-size:0.85rem; color:#999;">${escapeHtml(funnel.hero_cta_subtext)}</p>
-    <a href="#application" class="funnel-cta">${escapeHtml(funnel.hero_cta_text)}</a>
   </div>
 
   <!-- STEP 1: VIDEO -->
