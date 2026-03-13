@@ -408,103 +408,52 @@ export default function FunnelBuilderPage() {
               </button>
             </div>
 
-            {/* ====== FUNNEL PREVIEW — styled like a real landing page ====== */}
-            <div className="rounded-xl overflow-hidden border border-[var(--border-default)] shadow-lg">
+            {/* ====== FUNNEL PREVIEW ====== */}
+            <div className="rounded-xl overflow-hidden border border-[var(--border-default)] shadow-lg bg-white">
 
-              {/* Hero */}
-              <div className="bg-white text-center px-8 py-16 md:py-24">
+              {/* Hero — headline + subheadline + CTA */}
+              <div className="text-center px-6 pt-14 pb-10">
                 <div className="max-w-2xl mx-auto">
-                  <h1 className="text-3xl md:text-5xl font-extrabold text-gray-900 leading-tight mb-4" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
+                  <h1 className="text-3xl md:text-[2.7rem] font-black text-black leading-tight mb-4" style={{ fontFamily: "'Poppins', 'Montserrat', sans-serif" }}>
                     {funnel.headline}
                   </h1>
-                  <p className="text-lg md:text-xl text-gray-600 mb-8">{funnel.subheadline}</p>
-                  <a href="#funnel-application" className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white text-lg font-bold px-10 py-4 rounded-lg shadow-lg shadow-emerald-500/25 transition-all">
+                  <p className="text-base md:text-lg text-gray-500 mb-2">{funnel.subheadline}</p>
+                  <p className="text-sm text-gray-400 mb-8">{funnel.hero_cta_subtext}</p>
+                  <a href="#funnel-application" className="inline-block bg-[#7ed956] hover:brightness-110 text-white text-xl font-bold px-10 py-4 rounded-lg transition-all" style={{ boxShadow: '0 8px 24px -8px rgba(126,217,86,0.5)' }}>
                     {funnel.hero_cta_text}
                   </a>
-                  <p className="text-sm text-gray-400 mt-3">{funnel.hero_cta_subtext}</p>
                 </div>
               </div>
 
-              {/* Video */}
-              <div className="bg-gray-50 text-center px-8 py-14">
+              {/* Step 1: Watch Video */}
+              <div className="text-center px-6 py-10 bg-white">
                 <div className="max-w-2xl mx-auto">
-                  <p className="text-gray-600 mb-6 text-lg">{funnel.video_section.pre_video_text}</p>
-                  <div className="bg-black rounded-xl overflow-hidden shadow-2xl flex items-center justify-center mx-auto" style={{ aspectRatio: '16/9', maxWidth: '640px' }}>
-                    <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all">
-                      <span className="text-white text-3xl ml-1">&#9654;</span>
+                  <h2 className="text-xl md:text-2xl font-bold text-black mb-2" style={{ fontFamily: "'Poppins', 'Montserrat', sans-serif" }}>
+                    Step 1: Watch The Video
+                  </h2>
+                  <p className="text-gray-500 mb-6">{funnel.video_section.pre_video_text}</p>
+                  <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center mx-auto" style={{ aspectRatio: '16/9', maxWidth: '600px' }}>
+                    <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all">
+                      <span className="text-white text-2xl ml-1">&#9654;</span>
                     </div>
                   </div>
-                  <p className="text-gray-600 mt-6">{funnel.video_section.post_video_text}</p>
-                  <a href="#funnel-application" className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-8 py-3.5 rounded-lg shadow-lg shadow-emerald-500/25 transition-all mt-6">
-                    {funnel.hero_cta_text}
-                  </a>
+                  <p className="text-gray-500 mt-5">{funnel.video_section.post_video_text}</p>
                 </div>
               </div>
 
-              {/* Who This Is For */}
-              <div className="bg-white px-8 py-14">
-                <div className="max-w-3xl mx-auto">
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 text-center mb-10" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
-                    {funnel.who_this_is_for.section_title}
+              {/* Step 2: Apply Below */}
+              <div id="funnel-application" className="text-center px-6 py-10 bg-white">
+                <div className="max-w-md mx-auto">
+                  <h2 className="text-xl md:text-2xl font-bold text-black mb-1" style={{ fontFamily: "'Poppins', 'Montserrat', sans-serif" }}>
+                    Step 2: Apply Below
                   </h2>
-                  <div className="grid md:grid-cols-2 gap-8">
-                    <div>
-                      <ul className="space-y-4">
-                        {funnel.who_this_is_for.qualifiers.map((q, i) => (
-                          <li key={i} className="flex gap-3 text-gray-700">
-                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">&#10003;</span>
-                            <span>{q}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <ul className="space-y-4">
-                        {funnel.who_this_is_for.disqualifiers.map((d, i) => (
-                          <li key={i} className="flex gap-3 text-gray-500">
-                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center text-sm font-bold">&#10007;</span>
-                            <span>{d}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Social Proof */}
-              <div className="bg-gray-50 px-8 py-14">
-                <div className="max-w-3xl mx-auto">
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 text-center mb-10" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
-                    {funnel.social_proof.section_title}
-                  </h2>
-                  <div className="grid md:grid-cols-3 gap-6">
-                    {funnel.social_proof.testimonials.map((t, i) => (
-                      <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                        <p className="text-gray-700 italic mb-4">&ldquo;{t.quote}&rdquo;</p>
-                        <div className="border-t border-gray-100 pt-3">
-                          <p className="font-bold text-gray-900">{t.name}</p>
-                          <p className="text-sm text-emerald-600 font-medium">{t.result}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Application Form */}
-              <div id="funnel-application" className="bg-white px-8 py-14">
-                <div className="max-w-lg mx-auto">
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 text-center mb-3" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
-                    {funnel.application.section_title}
-                  </h2>
-                  <p className="text-gray-500 text-center mb-8">{funnel.application.section_description}</p>
-                  <div className="space-y-5">
+                  <p className="text-gray-400 text-sm mb-6">{funnel.application.section_description}</p>
+                  <div className="space-y-4 text-left">
                     {funnel.application.fields.map((f, i) => (
                       <div key={i}>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">{f.label}</label>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">{f.label}</label>
                         {f.type === 'select' && f.options ? (
-                          <select className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 bg-white text-gray-500 text-sm focus:border-emerald-500 focus:outline-none transition-colors">
+                          <select className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-500 text-sm">
                             <option>{f.placeholder}</option>
                             {f.options.map((o, j) => (
                               <option key={j}>{o}</option>
@@ -514,51 +463,41 @@ export default function FunnelBuilderPage() {
                           <textarea
                             placeholder={f.placeholder}
                             rows={3}
-                            className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 text-sm placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none transition-colors"
+                            className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm placeholder:text-gray-400"
                             readOnly
                           />
                         ) : (
                           <input
                             type={f.type}
                             placeholder={f.placeholder}
-                            className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 text-sm placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none transition-colors"
+                            className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm placeholder:text-gray-400"
                             readOnly
                           />
                         )}
                       </div>
                     ))}
-                    <button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-lg text-lg shadow-lg shadow-emerald-500/25 transition-all mt-2">
+                    <button className="w-full bg-[#7ed956] hover:brightness-110 text-white font-bold py-4 rounded-lg text-lg transition-all mt-2" style={{ boxShadow: '0 8px 24px -8px rgba(126,217,86,0.5)' }}>
                       {funnel.application.submit_text}
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* About */}
-              <div className="bg-gray-50 px-8 py-14">
-                <div className="max-w-2xl mx-auto text-center">
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-4" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
-                    {funnel.about_section.title}
+              {/* Testimonials */}
+              <div className="px-6 py-10 bg-white border-t border-gray-100">
+                <div className="max-w-3xl mx-auto">
+                  <h2 className="text-xl md:text-2xl font-bold text-black text-center mb-8" style={{ fontFamily: "'Poppins', 'Montserrat', sans-serif" }}>
+                    {funnel.social_proof.section_title}
                   </h2>
-                  <p className="text-gray-600 text-lg mb-6">{funnel.about_section.bio}</p>
-                  <div className="flex flex-wrap justify-center gap-3">
-                    {funnel.about_section.credentials.map((c, i) => (
-                      <span key={i} className="inline-block px-4 py-2 rounded-full bg-white border border-gray-200 text-sm font-medium text-gray-700 shadow-sm">{c}</span>
+                  <div className="grid md:grid-cols-3 gap-5">
+                    {funnel.social_proof.testimonials.map((t, i) => (
+                      <div key={i} className="bg-gray-50 rounded-xl p-5 border border-gray-100">
+                        <p className="text-gray-700 text-sm mb-3">&ldquo;{t.quote}&rdquo;</p>
+                        <p className="font-bold text-sm text-black">{t.name}</p>
+                        <p className="text-xs text-[#7ed956] font-semibold">{t.result}</p>
+                      </div>
                     ))}
                   </div>
-                </div>
-              </div>
-
-              {/* Final CTA */}
-              <div className="bg-gray-900 text-center px-8 py-16">
-                <div className="max-w-2xl mx-auto">
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-3" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
-                    {funnel.final_cta.headline}
-                  </h2>
-                  <p className="text-gray-400 text-lg mb-8">{funnel.final_cta.subheadline}</p>
-                  <a href="#funnel-application" className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white text-lg font-bold px-10 py-4 rounded-lg shadow-lg shadow-emerald-500/25 transition-all">
-                    {funnel.final_cta.cta_text}
-                  </a>
                 </div>
               </div>
             </div>
@@ -567,7 +506,7 @@ export default function FunnelBuilderPage() {
             <div className="card p-5 flex items-center justify-between">
               <div>
                 <h4 className="font-medium text-[var(--text-primary)]">Ready to use?</h4>
-                <p className="text-sm text-[var(--text-secondary)]">Copy the HTML and paste it into GoHighLevel, ClickFunnels, or any page builder.</p>
+                <p className="text-sm text-[var(--text-secondary)]">Copy the HTML and paste into GoHighLevel, ClickFunnels, or any builder.</p>
               </div>
               <button
                 onClick={handleCopyHtml}
