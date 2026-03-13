@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { randomBytes } from 'crypto';
-import { createUser, getUserByEmail, updateUserMemberStatus } from '@/lib/users';
-
-function generatePassword(): string {
-  // Generate a readable 12-char password: letters + digits
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  const bytes = randomBytes(12);
-  let password = '';
-  for (let i = 0; i < 12; i++) {
-    password += chars[bytes[i] % chars.length];
-  }
-  return password;
-}
+import { supabase } from '@/lib/supabase';
+import { getUserByEmail, updateUserMemberStatus } from '@/lib/users';
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,60 +20,40 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { email, firstName, first_name } = body;
-    const name = firstName || first_name || 'VIP Member';
+    const name = firstName || first_name || null;
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    // Check if user already exists
-    const existingUser = await getUserByEmail(email);
+    const normalizedEmail = email.toLowerCase().trim();
 
-    if (existingUser) {
-      // User already has an account — just upgrade to member
-      if (!existingUser.is_member) {
-        await updateUserMemberStatus(existingUser.id, true);
-      }
+    // Store the verified purchase email
+    const { error: insertError } = await supabase
+      .from('vip_purchases')
+      .upsert(
+        { email: normalizedEmail, first_name: name, source: 'fanbasis' },
+        { onConflict: 'email' }
+      );
 
-      return NextResponse.json({
-        success: true,
-        action: 'upgraded',
-        message: 'Existing user upgraded to VIP member',
-        user: {
-          email: existingUser.email,
-          firstName: existingUser.first_name,
-          isNew: false,
-        },
-      });
+    if (insertError) {
+      console.error('Error storing VIP purchase:', insertError);
+      return NextResponse.json({ error: 'Failed to store purchase' }, { status: 500 });
     }
 
-    // New user — create account with generated password
-    const password = generatePassword();
-
-    const user = await createUser({
-      email,
-      first_name: name,
-      password,
-    });
-
-    // Immediately upgrade to full member (they paid)
-    await updateUserMemberStatus(user.id, true);
+    // If user already has an account, auto-upgrade them to member
+    const existingUser = await getUserByEmail(normalizedEmail);
+    if (existingUser && !existingUser.is_member) {
+      await updateUserMemberStatus(existingUser.id, true);
+    }
 
     return NextResponse.json({
       success: true,
-      action: 'created',
-      message: 'New VIP member account created',
-      user: {
-        email: user.email,
-        firstName: user.first_name,
-        isNew: true,
-      },
-      // Zapier uses these to send the welcome email
-      credentials: {
-        email: user.email,
-        password,
-        loginUrl: 'https://creatorpairing.com/login',
-      },
+      message: existingUser
+        ? 'Purchase verified — existing user upgraded to VIP'
+        : 'Purchase verified — user can now sign up at /vip',
+      email: normalizedEmail,
+      signupUrl: 'https://creatorpairing.com/vip',
     });
   } catch (error) {
     console.error('Zapier webhook error:', error);

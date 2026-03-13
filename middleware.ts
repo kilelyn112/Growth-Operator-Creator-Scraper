@@ -6,13 +6,13 @@ const JWT_SECRET = new TextEncoder().encode(
 );
 
 // Routes that don't require authentication
-const publicRoutes = ['/login', '/signup'];
+const publicRoutes = ['/login', '/signup', '/vip'];
 
 // Routes that require authentication
 const protectedRoutes = ['/', '/admin', '/outreach', '/funnel-builder'];
 
 // API routes that don't require authentication
-const publicApiRoutes = ['/api/auth/login', '/api/auth/signup', '/api/webhooks/zapier'];
+const publicApiRoutes = ['/api/auth/login', '/api/auth/signup', '/api/auth/vip-signup', '/api/webhooks/zapier'];
 
 async function verifyTokenEdge(token: string): Promise<boolean> {
   try {

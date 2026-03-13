@@ -275,8 +275,8 @@ export async function getCreatorsByJobId(jobId: string): Promise<Creator[]> {
   if (error) return [];
 
   return (data || [])
-    .filter(row => row.creators)
-    .map(row => {
+    .filter((row: { creator_id: number; creators: unknown }) => row.creators)
+    .map((row: { creator_id: number; creators: unknown }) => {
       const creator = row.creators as unknown as Record<string, unknown>;
       return {
         ...(creator as unknown as Creator),
