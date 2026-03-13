@@ -390,13 +390,14 @@ export default function FunnelBuilderPage() {
         {/* ===== STEP 5: RESULT ===== */}
         {step === 'result' && funnel && (
           <div className="space-y-6">
+            {/* Top bar */}
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-fancy text-2xl font-semibold text-[var(--text-primary)]">
-                  Funnel for {funnel.creator_name}
+                  {funnel.creator_name}&apos;s Call Funnel
                 </h2>
                 <p className="text-sm text-[var(--text-secondary)] mt-1">
-                  Copy the HTML or use each section individually
+                  Preview below — copy the HTML to paste into GoHighLevel, ClickFunnels, or any page builder
                 </p>
               </div>
               <button
@@ -407,151 +408,173 @@ export default function FunnelBuilderPage() {
               </button>
             </div>
 
-            {/* Funnel Preview */}
-            <div className="space-y-4">
+            {/* ====== FUNNEL PREVIEW — styled like a real landing page ====== */}
+            <div className="rounded-xl overflow-hidden border border-[var(--border-default)] shadow-lg">
+
               {/* Hero */}
-              <div className="card p-8 text-center bg-gradient-to-b from-[var(--bg-subtle)] to-[var(--bg-primary)]">
-                <span className="badge badge-accent mb-4">HERO SECTION</span>
-                <h1 className="font-fancy text-3xl font-bold text-[var(--text-primary)] mb-3">{funnel.headline}</h1>
-                <h2 className="text-lg text-[var(--text-secondary)] mb-6">{funnel.subheadline}</h2>
-                <div className="inline-block bg-[var(--accent)] text-white px-8 py-3 rounded-lg font-medium">
-                  {funnel.hero_cta_text}
+              <div className="bg-white text-center px-8 py-16 md:py-24">
+                <div className="max-w-2xl mx-auto">
+                  <h1 className="text-3xl md:text-5xl font-extrabold text-gray-900 leading-tight mb-4" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
+                    {funnel.headline}
+                  </h1>
+                  <p className="text-lg md:text-xl text-gray-600 mb-8">{funnel.subheadline}</p>
+                  <a href="#funnel-application" className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white text-lg font-bold px-10 py-4 rounded-lg shadow-lg shadow-emerald-500/25 transition-all">
+                    {funnel.hero_cta_text}
+                  </a>
+                  <p className="text-sm text-gray-400 mt-3">{funnel.hero_cta_subtext}</p>
                 </div>
-                <p className="text-xs text-[var(--text-muted)] mt-2">{funnel.hero_cta_subtext}</p>
               </div>
 
-              {/* Video Section */}
-              <div className="card p-6 text-center">
-                <span className="badge bg-[var(--bg-subtle)] text-[var(--text-primary)] mb-3">VIDEO SECTION</span>
-                <p className="text-[var(--text-secondary)] mb-4">{funnel.video_section.pre_video_text}</p>
-                <div className="max-w-lg mx-auto bg-black rounded-lg flex items-center justify-center" style={{ aspectRatio: '16/9' }}>
-                  <span className="text-white text-5xl">&#9654;</span>
-                </div>
-                <p className="text-[var(--text-secondary)] mt-4">{funnel.video_section.post_video_text}</p>
-                <div className="inline-block bg-[var(--accent)] text-white px-8 py-3 rounded-lg font-medium mt-4">
-                  {funnel.hero_cta_text}
+              {/* Video */}
+              <div className="bg-gray-50 text-center px-8 py-14">
+                <div className="max-w-2xl mx-auto">
+                  <p className="text-gray-600 mb-6 text-lg">{funnel.video_section.pre_video_text}</p>
+                  <div className="bg-black rounded-xl overflow-hidden shadow-2xl flex items-center justify-center mx-auto" style={{ aspectRatio: '16/9', maxWidth: '640px' }}>
+                    <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center cursor-pointer hover:bg-white/30 transition-all">
+                      <span className="text-white text-3xl ml-1">&#9654;</span>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mt-6">{funnel.video_section.post_video_text}</p>
+                  <a href="#funnel-application" className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-8 py-3.5 rounded-lg shadow-lg shadow-emerald-500/25 transition-all mt-6">
+                    {funnel.hero_cta_text}
+                  </a>
                 </div>
               </div>
 
               {/* Who This Is For */}
-              <div className="card p-6">
-                <span className="badge badge-success mb-3">WHO THIS IS FOR</span>
-                <h3 className="font-fancy text-xl font-semibold text-[var(--text-primary)] mb-4">{funnel.who_this_is_for.section_title}</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="text-sm font-semibold text-[var(--accent)] uppercase tracking-wider mb-3">Qualifiers</h4>
-                    <ul className="space-y-2">
-                      {funnel.who_this_is_for.qualifiers.map((q, i) => (
-                        <li key={i} className="flex gap-2 text-sm text-[var(--text-primary)]">
-                          <span className="text-[var(--accent)] font-bold mt-0.5">&#10003;</span>{q}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-[var(--status-error)] uppercase tracking-wider mb-3">Disqualifiers</h4>
-                    <ul className="space-y-2">
-                      {funnel.who_this_is_for.disqualifiers.map((d, i) => (
-                        <li key={i} className="flex gap-2 text-sm text-[var(--text-primary)]">
-                          <span className="text-[var(--status-error)] font-bold mt-0.5">&#10007;</span>{d}
-                        </li>
-                      ))}
-                    </ul>
+              <div className="bg-white px-8 py-14">
+                <div className="max-w-3xl mx-auto">
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 text-center mb-10" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
+                    {funnel.who_this_is_for.section_title}
+                  </h2>
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div>
+                      <ul className="space-y-4">
+                        {funnel.who_this_is_for.qualifiers.map((q, i) => (
+                          <li key={i} className="flex gap-3 text-gray-700">
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">&#10003;</span>
+                            <span>{q}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <ul className="space-y-4">
+                        {funnel.who_this_is_for.disqualifiers.map((d, i) => (
+                          <li key={i} className="flex gap-3 text-gray-500">
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center text-sm font-bold">&#10007;</span>
+                            <span>{d}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Social Proof */}
-              <div className="card p-6">
-                <span className="badge badge-warning mb-3">SOCIAL PROOF</span>
-                <h3 className="font-fancy text-xl font-semibold text-[var(--text-primary)] mb-4">{funnel.social_proof.section_title}</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  {funnel.social_proof.testimonials.map((t, i) => (
-                    <div key={i} className="p-4 bg-[var(--bg-subtle)] rounded-lg">
-                      <p className="text-sm text-[var(--text-primary)] italic mb-3">&ldquo;{t.quote}&rdquo;</p>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">&mdash; {t.name}</p>
-                      <p className="text-xs text-[var(--accent)] mt-1">{t.result}</p>
-                    </div>
-                  ))}
+              <div className="bg-gray-50 px-8 py-14">
+                <div className="max-w-3xl mx-auto">
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 text-center mb-10" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
+                    {funnel.social_proof.section_title}
+                  </h2>
+                  <div className="grid md:grid-cols-3 gap-6">
+                    {funnel.social_proof.testimonials.map((t, i) => (
+                      <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                        <p className="text-gray-700 italic mb-4">&ldquo;{t.quote}&rdquo;</p>
+                        <div className="border-t border-gray-100 pt-3">
+                          <p className="font-bold text-gray-900">{t.name}</p>
+                          <p className="text-sm text-emerald-600 font-medium">{t.result}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {/* Application Form */}
-              <div className="card p-6 border-2 border-[var(--accent-border)]">
-                <span className="badge badge-accent mb-3">APPLICATION FORM</span>
-                <h3 className="font-fancy text-xl font-semibold text-[var(--text-primary)] mb-2">{funnel.application.section_title}</h3>
-                <p className="text-[var(--text-secondary)] mb-6">{funnel.application.section_description}</p>
-                <div className="max-w-md mx-auto space-y-4">
-                  {funnel.application.fields.map((f, i) => (
-                    <div key={i}>
-                      <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">{f.label}</label>
-                      {f.type === 'select' && f.options ? (
-                        <select className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-secondary)] text-sm">
-                          <option>{f.placeholder}</option>
-                          {f.options.map((o, j) => (
-                            <option key={j}>{o}</option>
-                          ))}
-                        </select>
-                      ) : f.type === 'textarea' ? (
-                        <textarea
-                          placeholder={f.placeholder}
-                          rows={3}
-                          className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-sm placeholder:text-[var(--text-muted)]"
-                          readOnly
-                        />
-                      ) : (
-                        <input
-                          type={f.type}
-                          placeholder={f.placeholder}
-                          className="w-full px-3 py-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-sm placeholder:text-[var(--text-muted)]"
-                          readOnly
-                        />
-                      )}
-                    </div>
-                  ))}
-                  <div className="inline-block bg-[var(--accent)] text-white px-8 py-3 rounded-lg font-medium w-full text-center mt-2">
-                    {funnel.application.submit_text}
+              <div id="funnel-application" className="bg-white px-8 py-14">
+                <div className="max-w-lg mx-auto">
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 text-center mb-3" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
+                    {funnel.application.section_title}
+                  </h2>
+                  <p className="text-gray-500 text-center mb-8">{funnel.application.section_description}</p>
+                  <div className="space-y-5">
+                    {funnel.application.fields.map((f, i) => (
+                      <div key={i}>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">{f.label}</label>
+                        {f.type === 'select' && f.options ? (
+                          <select className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 bg-white text-gray-500 text-sm focus:border-emerald-500 focus:outline-none transition-colors">
+                            <option>{f.placeholder}</option>
+                            {f.options.map((o, j) => (
+                              <option key={j}>{o}</option>
+                            ))}
+                          </select>
+                        ) : f.type === 'textarea' ? (
+                          <textarea
+                            placeholder={f.placeholder}
+                            rows={3}
+                            className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 text-sm placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none transition-colors"
+                            readOnly
+                          />
+                        ) : (
+                          <input
+                            type={f.type}
+                            placeholder={f.placeholder}
+                            className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 text-sm placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none transition-colors"
+                            readOnly
+                          />
+                        )}
+                      </div>
+                    ))}
+                    <button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-lg text-lg shadow-lg shadow-emerald-500/25 transition-all mt-2">
+                      {funnel.application.submit_text}
+                    </button>
                   </div>
                 </div>
               </div>
 
               {/* About */}
-              <div className="card p-6">
-                <span className="badge bg-[var(--bg-subtle)] text-[var(--text-primary)] mb-3">ABOUT</span>
-                <h3 className="font-fancy text-xl font-semibold text-[var(--text-primary)] mb-2">{funnel.about_section.title}</h3>
-                <p className="text-[var(--text-secondary)] mb-4">{funnel.about_section.bio}</p>
-                <div className="flex flex-wrap gap-2">
-                  {funnel.about_section.credentials.map((c, i) => (
-                    <span key={i} className="badge badge-success">{c}</span>
-                  ))}
+              <div className="bg-gray-50 px-8 py-14">
+                <div className="max-w-2xl mx-auto text-center">
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-4" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
+                    {funnel.about_section.title}
+                  </h2>
+                  <p className="text-gray-600 text-lg mb-6">{funnel.about_section.bio}</p>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {funnel.about_section.credentials.map((c, i) => (
+                      <span key={i} className="inline-block px-4 py-2 rounded-full bg-white border border-gray-200 text-sm font-medium text-gray-700 shadow-sm">{c}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {/* Final CTA */}
-              <div className="card p-8 text-center bg-[var(--text-primary)] text-white">
-                <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-xs uppercase tracking-wider mb-4">FINAL CTA</span>
-                <h3 className="font-fancy text-2xl font-bold mb-2">{funnel.final_cta.headline}</h3>
-                <p className="text-white/70 mb-6">{funnel.final_cta.subheadline}</p>
-                <div className="inline-block bg-[var(--accent)] text-white px-8 py-3 rounded-lg font-medium">
-                  {funnel.final_cta.cta_text}
+              <div className="bg-gray-900 text-center px-8 py-16">
+                <div className="max-w-2xl mx-auto">
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-3" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif" }}>
+                    {funnel.final_cta.headline}
+                  </h2>
+                  <p className="text-gray-400 text-lg mb-8">{funnel.final_cta.subheadline}</p>
+                  <a href="#funnel-application" className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white text-lg font-bold px-10 py-4 rounded-lg shadow-lg shadow-emerald-500/25 transition-all">
+                    {funnel.final_cta.cta_text}
+                  </a>
                 </div>
               </div>
             </div>
 
-            {/* Copy HTML */}
-            <div className="card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium text-[var(--text-primary)]">HTML Export</h4>
-                <button
-                  onClick={handleCopyHtml}
-                  className={`btn-secondary text-sm ${copied ? 'border-[var(--accent)] text-[var(--accent)]' : ''}`}
-                >
-                  {copied ? 'Copied!' : 'Copy HTML'}
-                </button>
+            {/* Copy HTML bar */}
+            <div className="card p-5 flex items-center justify-between">
+              <div>
+                <h4 className="font-medium text-[var(--text-primary)]">Ready to use?</h4>
+                <p className="text-sm text-[var(--text-secondary)]">Copy the HTML and paste it into GoHighLevel, ClickFunnels, or any page builder.</p>
               </div>
-              <pre className="bg-[var(--bg-subtle)] p-4 rounded-lg text-xs text-[var(--text-secondary)] overflow-x-auto max-h-48 overflow-y-auto">
-                {funnelHtml?.slice(0, 500)}...
-              </pre>
+              <button
+                onClick={handleCopyHtml}
+                className={`btn-primary whitespace-nowrap ${copied ? 'bg-[var(--accent)]' : ''}`}
+              >
+                {copied ? 'Copied!' : 'Copy HTML'}
+              </button>
             </div>
           </div>
         )}
