@@ -13,11 +13,18 @@ const STEPS = [
 ];
 
 export default function DashboardPage() {
+  return (
+    <DashboardWrapper>
+      <DashboardContent />
+    </DashboardWrapper>
+  );
+}
+
+function DashboardContent() {
   const { session } = useSession();
   const firstName = session?.user?.firstName || 'there';
 
   return (
-    <DashboardWrapper>
     <div>
       {/* Welcome */}
       <div className="mb-10">
@@ -103,7 +110,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
-    </DashboardWrapper>
   );
 }
 

@@ -99,6 +99,14 @@ const PLATFORMS: { id: Platform; name: string; available: boolean }[] = [
 ];
 
 export default function LeadsPage() {
+  return (
+    <DashboardWrapper>
+      <LeadsContent />
+    </DashboardWrapper>
+  );
+}
+
+function LeadsContent() {
   const { session, isLoading: isSessionLoading } = useSession();
   const [appMode, setAppMode] = useState<AppMode>('creator-hunter');
 
@@ -455,7 +463,6 @@ export default function LeadsPage() {
   }
 
   return (
-    <DashboardWrapper>
     <div>
       {/* Page Header */}
       <div className="flex items-center justify-between mb-8">
@@ -840,6 +847,5 @@ export default function LeadsPage() {
       )}
 
     </div>
-    </DashboardWrapper>
   );
 }

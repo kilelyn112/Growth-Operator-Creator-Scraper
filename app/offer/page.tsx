@@ -52,6 +52,14 @@ const EMPTY_OFFER: OfferData = {
 };
 
 export default function OfferBuilderPage() {
+  return (
+    <DashboardWrapper>
+      <OfferContent />
+    </DashboardWrapper>
+  );
+}
+
+function OfferContent() {
   const { session } = useSession();
   const [step, setStep] = useState<WizardStep>(1);
   const [offer, setOffer] = useState<OfferData>(EMPTY_OFFER);
@@ -182,7 +190,6 @@ export default function OfferBuilderPage() {
   }
 
   return (
-    <DashboardWrapper>
     <div>
       {/* Header */}
       <div className="mb-8">
@@ -653,6 +660,5 @@ export default function OfferBuilderPage() {
         </div>
       </div>
     </div>
-    </DashboardWrapper>
   );
 }
