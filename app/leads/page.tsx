@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import DashboardWrapper from '@/components/DashboardWrapper';
 import { useSession } from '@/components/SessionProvider';
 import NichePicker from '@/components/NichePicker';
 import JobStatus from '@/components/JobStatus';
@@ -454,6 +455,7 @@ export default function LeadsPage() {
   }
 
   return (
+    <DashboardWrapper>
     <div>
       {/* Page Header */}
       <div className="flex items-center justify-between mb-8">
@@ -838,5 +840,6 @@ export default function LeadsPage() {
       )}
 
     </div>
+    </DashboardWrapper>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import DashboardWrapper from '@/components/DashboardWrapper';
 import { useSession } from '@/components/SessionProvider';
 
 const STEPS = [
@@ -16,6 +17,7 @@ export default function DashboardPage() {
   const firstName = session?.user?.firstName || 'there';
 
   return (
+    <DashboardWrapper>
     <div>
       {/* Welcome */}
       <div className="mb-10">
@@ -101,5 +103,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </DashboardWrapper>
   );
 }

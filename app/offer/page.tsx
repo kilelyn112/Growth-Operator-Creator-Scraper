@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import DashboardWrapper from '@/components/DashboardWrapper';
 import { useSession } from '@/components/SessionProvider';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
@@ -181,6 +182,7 @@ export default function OfferBuilderPage() {
   }
 
   return (
+    <DashboardWrapper>
     <div>
       {/* Header */}
       <div className="mb-8">
@@ -651,5 +653,6 @@ export default function OfferBuilderPage() {
         </div>
       </div>
     </div>
+    </DashboardWrapper>
   );
 }
