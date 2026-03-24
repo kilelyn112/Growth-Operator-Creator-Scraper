@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 // GET — fetch user's offer
-export async function GET(request: NextRequest) {
-  const session = await getSession(request);
+export async function GET() {
+  const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data, error } = await supabase
     .from('offers')
     .select('*')
-    .eq('user_id', session.userId)
+    .eq('user_id', session.user.id)
     .single();
 
   if (error && error.code !== 'PGRST116') {
@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
 }
 
 // POST — create or update user's offer
-export async function POST(request: NextRequest) {
-  const session = await getSession(request);
+export async function POST(request: Request) {
+  const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
@@ -31,14 +31,14 @@ export async function POST(request: NextRequest) {
   const { data: existing } = await supabase
     .from('offers')
     .select('id')
-    .eq('user_id', session.userId)
+    .eq('user_id', session.user.id)
     .single();
 
   if (existing) {
     const { data, error } = await supabase
       .from('offers')
       .update({ ...body, updated_at: new Date().toISOString() })
-      .eq('user_id', session.userId)
+      .eq('user_id', session.user.id)
       .select()
       .single();
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   } else {
     const { data, error } = await supabase
       .from('offers')
-      .insert({ ...body, user_id: session.userId })
+      .insert({ ...body, user_id: session.user.id })
       .select()
       .single();
 
