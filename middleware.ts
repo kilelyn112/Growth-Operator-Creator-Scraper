@@ -9,7 +9,7 @@ const JWT_SECRET = new TextEncoder().encode(
 const publicRoutes = ['/login', '/signup', '/vip'];
 
 // Routes that require authentication
-const protectedRoutes = ['/', '/admin', '/outreach', '/funnel-builder'];
+const protectedRoutes = ['/', '/admin', '/outreach', '/funnel-builder', '/leads', '/offer', '/presence', '/pitch', '/pipeline'];
 
 // API routes that don't require authentication
 const publicApiRoutes = ['/api/auth/login', '/api/auth/signup', '/api/auth/vip-signup', '/api/webhooks/zapier'];

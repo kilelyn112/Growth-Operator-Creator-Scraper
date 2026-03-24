@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useSession } from '@/components/SessionProvider';
 import NichePicker from '@/components/NichePicker';
 import JobStatus from '@/components/JobStatus';
 import ResultsTable from '@/components/ResultsTable';
@@ -97,41 +97,9 @@ const PLATFORMS: { id: Platform; name: string; available: boolean }[] = [
   { id: 'x', name: 'X (Twitter)', available: true },
 ];
 
-// Admin emails that can access admin page
-const ADMIN_EMAILS = ['kile@growthoperator.com', 'admin@creatorpairing.com', 'kilelyn8@gmail.com'];
-
-export default function Home() {
-  const router = useRouter();
-  const [session, setSession] = useState<UserSession | null>(null);
-  const [isSessionLoading, setIsSessionLoading] = useState(true);
+export default function LeadsPage() {
+  const { session, isLoading: isSessionLoading } = useSession();
   const [appMode, setAppMode] = useState<AppMode>('creator-hunter');
-
-  // Auth effects
-  useEffect(() => {
-    checkSession();
-  }, []);
-
-  const checkSession = async () => {
-    try {
-      const response = await fetch('/api/auth/session');
-      const data = await response.json();
-      setSession(data.authenticated ? data : null);
-    } catch (error) {
-      console.error('Session check error:', error);
-      setSession(null);
-    } finally {
-      setIsSessionLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
 
   // Creator Hunter state
   const [jobId, setJobId] = useState<string | null>(null);
@@ -479,147 +447,58 @@ export default function Home() {
   // Show loading while checking session
   if (isSessionLoading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[var(--text-secondary)]">Loading...</p>
-        </div>
+      <div className="flex items-center justify-center py-20">
+        <div className="w-10 h-10 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // Redirect expired users to growthoperator.com
-  if (session && session.trial && !session.trial.hasAccess) {
-    window.location.href = 'https://www.growthoperator.com';
-    return null;
-  }
-
-  const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email);
-
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* Header */}
-      <header className="border-b border-[var(--border-default)]">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo & Title */}
-            <div>
-              <h1 className="font-fancy text-2xl font-semibold text-[var(--text-primary)]">
-                creatorpairing.com
-              </h1>
-              <p className="text-sm text-[var(--text-secondary)] mt-0.5">
-                {appMode === 'creator-hunter'
-                  ? 'Find qualified creators to partner with'
-                  : 'Discover ClickFunnels & GoHighLevel pages'}
-              </p>
-            </div>
-
-            {/* Mode Toggle */}
-            <div className="flex items-center gap-1 p-1 bg-[var(--bg-subtle)] rounded-lg">
-              <button
-                onClick={() => setAppMode('creator-hunter')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  appMode === 'creator-hunter'
-                    ? 'bg-[var(--text-primary)] text-white'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                Creators
-              </button>
-              <button
-                onClick={() => setAppMode('funnel-finder')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  appMode === 'funnel-finder'
-                    ? 'bg-[var(--text-primary)] text-white'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                Funnels
-              </button>
-              <a
-                href="/outreach"
-                className="px-4 py-2 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
-              >
-                Outreach
-              </a>
-              <a
-                href="/funnel-builder"
-                className="px-4 py-2 rounded-md text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
-              >
-                Funnel Builder
-              </a>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3">
-              {appMode === 'creator-hunter' && job && (
-                <button onClick={handleNewSearch} className="btn-secondary text-sm">
-                  New Search
-                </button>
-              )}
-              {appMode === 'funnel-finder' && funnelJob && (
-                <button onClick={handleNewFunnelSearch} className="btn-secondary text-sm">
-                  New Search
-                </button>
-              )}
-
-              {/* User Menu */}
-              {session?.user && (
-                <div className="flex items-center gap-3">
-                  {/* Trial Badge */}
-                  {session.trial?.isActive && !session.user.isMember && (
-                    <div className="px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
-                      {session.trial.daysRemaining} days left
-                    </div>
-                  )}
-                  {session.user.isMember && (
-                    <div className="px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">
-                      Member
-                    </div>
-                  )}
-
-                  {/* Admin Link */}
-                  {isAdmin && (
-                    <a href="/admin" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                      Admin
-                    </a>
-                  )}
-
-                  {/* User Name & Logout */}
-                  <div className="flex items-center gap-2 pl-3 border-l border-[var(--border-default)]">
-                    <span className="text-sm text-[var(--text-secondary)]">
-                      {session.user.firstName}
-                    </span>
-                    <button
-                      onClick={handleLogout}
-                      className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                    >
-                      Sign out
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Status */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-subtle)]">
-                <div className={`w-2 h-2 rounded-full ${
-                  (appMode === 'creator-hunter' && isSearching) || (appMode === 'funnel-finder' && isFunnelSearching)
-                    ? 'bg-[var(--status-warning)] animate-pulse'
-                    : 'bg-[var(--status-success)]'
-                }`} />
-                <span className="text-xs text-[var(--text-secondary)]">
-                  {(appMode === 'creator-hunter' && isSearching) || (appMode === 'funnel-finder' && isFunnelSearching)
-                    ? 'Scanning...'
-                    : 'Ready'}
-                </span>
-              </div>
-            </div>
-          </div>
+    <div>
+      {/* Page Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="font-fancy text-2xl font-semibold text-[var(--text-primary)]">
+            {appMode === 'creator-hunter' ? 'Find Creators' : 'Find Funnel Pages'}
+          </h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            {appMode === 'creator-hunter'
+              ? 'Search for qualified creators to partner with'
+              : 'Discover ClickFunnels & GoHighLevel pages in any niche'}
+          </p>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-6 py-10">
+        <div className="flex items-center gap-3">
+          {/* Mode Toggle */}
+          <div className="flex items-center gap-1 p-1 bg-[var(--bg-subtle)] rounded-lg">
+            <button
+              onClick={() => setAppMode('creator-hunter')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                appMode === 'creator-hunter'
+                  ? 'bg-[var(--text-primary)] text-white'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Creators
+            </button>
+            <button
+              onClick={() => setAppMode('funnel-finder')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                appMode === 'funnel-finder'
+                  ? 'bg-[var(--text-primary)] text-white'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Funnels
+            </button>
+          </div>
+          {appMode === 'creator-hunter' && job && (
+            <button onClick={handleNewSearch} className="btn-secondary text-sm">New Search</button>
+          )}
+          {appMode === 'funnel-finder' && funnelJob && (
+            <button onClick={handleNewFunnelSearch} className="btn-secondary text-sm">New Search</button>
+          )}
+        </div>
+      </div>
 
         {/* ===== FUNNEL FINDER MODE ===== */}
         {appMode === 'funnel-finder' && (
@@ -942,8 +821,6 @@ export default function Home() {
             )}
           </>
         )}
-      </main>
-
       {/* Send Email Modal */}
       {emailModalCreator && emailModalCreator.email && (
         <SendEmailModal
@@ -960,23 +837,6 @@ export default function Home() {
         />
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-[var(--border-default)] mt-auto">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between text-sm text-[var(--text-muted)]">
-            <span>
-              Powered by{' '}
-              <a href="https://growthoperator.com" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">
-                growthoperator.com
-              </a>
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-success)]" />
-              Systems operational
-            </span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
