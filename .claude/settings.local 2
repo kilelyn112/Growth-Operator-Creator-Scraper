@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "WebFetch(domain:join.paidinfull.vip)",
+      "WebFetch(domain:chelseaguerrero.com)"
+    ]
+  }
+}
