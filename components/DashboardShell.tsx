@@ -6,13 +6,9 @@ import { useSession } from './SessionProvider';
 const ADMIN_EMAILS = ['kile@growthoperator.com', 'admin@creatorpairing.com', 'kilelyn8@gmail.com'];
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Dashboard', icon: 'home', step: null },
-  { href: '/offer', label: 'Your Offer', icon: 'offer', step: 1 },
-  { href: '/presence', label: 'Your Presence', icon: 'presence', step: 2, comingSoon: true },
-  { href: '/leads', label: 'Find Creators', icon: 'leads', step: 3 },
-  { href: '/pitch', label: 'Your Pitch', icon: 'pitch', step: 4, comingSoon: true },
-  { href: '/outreach', label: 'Outreach', icon: 'outreach', step: 5 },
-  { href: '/pipeline', label: 'Pipeline', icon: 'pipeline', step: 6, comingSoon: true },
+  { href: '/', label: 'Find Creators', icon: 'leads', step: null },
+  { href: '/crm', label: 'My Leads', icon: 'pipeline', step: null, comingSoon: true },
+  { href: '/outreach', label: 'Outreach', icon: 'outreach', step: null },
 ];
 
 const TOOL_ITEMS = [
@@ -57,6 +53,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return null;
   }
 
+  // Redirect to onboarding if not completed
+  if (session.onboardingCompleted === false) {
+    router.push('/onboarding');
+    return null;
+  }
+
   const isAdmin = session.user && ADMIN_EMAILS.includes(session.user.email);
 
   const handleLogout = async () => {
@@ -95,10 +97,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               >
                 <NavIcon type={item.icon} active={isActive && !item.comingSoon} />
                 <span className="flex-1">{item.label}</span>
-                {item.step && (
-                  <span className={`text-[10px] font-medium ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
-                    {item.comingSoon ? 'Soon' : `Step ${item.step}`}
-                  </span>
+                {item.comingSoon && (
+                  <span className="text-[10px] font-medium text-[var(--text-muted)]">Soon</span>
                 )}
               </a>
             );

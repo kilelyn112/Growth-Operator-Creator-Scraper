@@ -18,6 +18,7 @@ export async function GET() {
         isMember: session.user.is_member,
       },
       trial: session.trialStatus,
+      onboardingCompleted: session.user.onboarding_completed ?? true,
     });
   } catch (error) {
     console.error('Session error:', error);

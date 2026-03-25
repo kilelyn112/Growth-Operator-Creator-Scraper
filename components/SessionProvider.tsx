@@ -15,6 +15,7 @@ export interface UserSession {
     daysRemaining: number;
     hasAccess: boolean;
   };
+  onboardingCompleted?: boolean;
 }
 
 interface SessionContextType {
