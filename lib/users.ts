@@ -263,6 +263,7 @@ function sanitizeUser(data: Record<string, unknown>): User {
     phone: data.phone as string | null,
     first_name: data.first_name as string,
     is_member: Boolean(data.is_member),
+    onboarding_completed: Boolean(data.onboarding_completed),
     trial_started_at: data.trial_started_at as string,
     last_login_at: data.last_login_at as string | null,
     created_at: data.created_at as string,
