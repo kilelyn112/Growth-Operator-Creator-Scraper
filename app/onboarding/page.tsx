@@ -6,11 +6,10 @@ import { useRouter } from 'next/navigation';
 type OnboardingStep = 'form' | 'booking' | 'done';
 
 const REVENUE_OPTIONS = [
-  '$0 - $1K/mo',
-  '$1K - $5K/mo',
+  '$0 - $5K/mo',
   '$5K - $10K/mo',
-  '$10K - $50K/mo',
-  '$50K+/mo',
+  '$10K - $20K/mo',
+  '$20K - $50K+/mo',
 ];
 
 export default function OnboardingPage() {
