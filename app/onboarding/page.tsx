@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-type OnboardingStep = 'form' | 'booking' | 'done';
+type OnboardingStep = 'form' | 'booking';
 
 const REVENUE_OPTIONS = [
   '$0 - $5K/mo',
@@ -24,6 +24,8 @@ export default function OnboardingPage() {
   const [revenue, setRevenue] = useState('');
   const [challenge, setChallenge] = useState('');
   const [triedSoFar, setTriedSoFar] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [youtube, setYoutube] = useState('');
 
   useEffect(() => {
     checkSession();
@@ -53,7 +55,6 @@ export default function OnboardingPage() {
     setSubmitting(true);
 
     try {
-      // Save to offers table
       await fetch('/api/offer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,24 +64,19 @@ export default function OnboardingPage() {
           price_point: revenue,
           before_state: challenge,
           unique_mechanism: triedSoFar,
+          credentials: [instagram, youtube].filter(Boolean),
           status: 'draft',
         }),
       });
+
+      // Mark onboarding complete BEFORE going to booking
+      await fetch('/api/onboarding/complete', { method: 'POST' });
 
       setStep('booking');
     } catch (err) {
       console.error('Submit error:', err);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleComplete = async () => {
-    try {
-      await fetch('/api/onboarding/complete', { method: 'POST' });
-      router.push('/');
-    } catch {
-      router.push('/');
     }
   };
 
@@ -187,6 +183,34 @@ export default function OnboardingPage() {
                 />
               </div>
 
+              {/* Social Profiles */}
+              <div>
+                <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">
+                  Your social profiles
+                </label>
+                <p className="text-xs text-[var(--text-muted)] mb-3">So we can audit your presence and help you optimize it.</p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-[var(--text-secondary)] w-20">Instagram</span>
+                    <input
+                      value={instagram}
+                      onChange={(e) => setInstagram(e.target.value)}
+                      placeholder="https://instagram.com/yourhandle"
+                      className="flex-1"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-[var(--text-secondary)] w-20">YouTube</span>
+                    <input
+                      value={youtube}
+                      onChange={(e) => setYoutube(e.target.value)}
+                      placeholder="https://youtube.com/@yourchannel"
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <button
                 onClick={handleSubmit}
                 disabled={submitting || !service.trim() || !target.trim() || !revenue}
@@ -221,12 +245,12 @@ export default function OnboardingPage() {
               />
             </div>
 
-            <button
-              onClick={handleComplete}
-              className="btn-accent w-full text-lg py-3.5"
+            <a
+              href="/"
+              className="btn-accent w-full text-lg py-3.5 block text-center"
             >
               Continue to Platform
-            </button>
+            </a>
             <p className="text-center text-sm text-[var(--text-muted)] mt-3">
               You can always book later from your dashboard
             </p>
