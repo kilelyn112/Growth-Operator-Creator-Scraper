@@ -7,6 +7,7 @@ export interface User {
   phone: string | null;
   first_name: string;
   is_member: boolean;
+  onboarding_completed: boolean;
   trial_started_at: string;
   last_login_at: string | null;
   created_at: string;
