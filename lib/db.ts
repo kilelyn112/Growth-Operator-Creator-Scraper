@@ -284,7 +284,7 @@ export async function getCreatorsByJobId(jobId: string): Promise<Creator[]> {
         job_id: jobId
       };
     })
-    .sort((a, b) => {
+    .sort((a: Creator, b: Creator) => {
       if (a.qualified !== b.qualified) return a.qualified ? -1 : 1;
       return b.followers - a.followers;
     });
@@ -317,7 +317,7 @@ export async function findExistingCreatorsByNiche(platform: Platform, niche: str
     .limit(limit);
 
   if (error) return [];
-  return (data || []).map(c => ({ ...c, qualified: Boolean(c.qualified) })) as Creator[];
+  return (data || []).map((c: Record<string, unknown>) => ({ ...c, qualified: Boolean(c.qualified) })) as Creator[];
 }
 
 // FLYWHEEL: Search creators by keyword across multiple fields (main flywheel function)
@@ -339,7 +339,7 @@ export async function searchCreatorsByKeyword(platform: Platform, keyword: strin
     console.error('Error searching creators:', error);
     return [];
   }
-  return (data || []).map(c => ({ ...c, qualified: Boolean(c.qualified) })) as Creator[];
+  return (data || []).map((c: Record<string, unknown>) => ({ ...c, qualified: Boolean(c.qualified) })) as Creator[];
 }
 
 // ADMIN: Clear cached creators for a specific niche/keyword and platform
