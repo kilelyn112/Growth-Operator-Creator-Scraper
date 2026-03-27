@@ -1,6 +1,7 @@
 // Server-only — do NOT import from client components
 import nodemailer from 'nodemailer';
 import { decrypt } from './email-crypto';
+import { ensureValidToken, sendGmailMessage } from './gmail';
 export { interpolateTemplate } from './email-constants';
 
 export interface EmailAccount {
@@ -8,10 +9,15 @@ export interface EmailAccount {
   user_id: number;
   email_address: string;
   display_name: string | null;
-  smtp_host: string;
+  smtp_host: string | null;
   smtp_port: number;
-  smtp_username: string;
-  smtp_password_encrypted: string;
+  smtp_username: string | null;
+  smtp_password_encrypted: string | null;
+  auth_type: 'smtp' | 'oauth_gmail';
+  oauth_access_token_encrypted: string | null;
+  oauth_refresh_token_encrypted: string | null;
+  oauth_token_expires_at: string | null;
+  oauth_scope: string | null;
   is_active: boolean;
   daily_send_limit: number;
   sends_today: number;
@@ -30,6 +36,9 @@ export interface SendEmailOptions {
 }
 
 function createTransport(account: EmailAccount) {
+  if (!account.smtp_host || !account.smtp_username || !account.smtp_password_encrypted) {
+    throw new Error('SMTP credentials are missing for this account');
+  }
   const password = decrypt(account.smtp_password_encrypted);
 
   return nodemailer.createTransport({
@@ -43,7 +52,8 @@ function createTransport(account: EmailAccount) {
   });
 }
 
-export async function sendEmail(account: EmailAccount, options: SendEmailOptions) {
+// Send email via SMTP (existing path)
+async function sendViaSmtp(account: EmailAccount, options: SendEmailOptions) {
   const transport = createTransport(account);
   const fromName = account.display_name || account.email_address;
 
@@ -61,6 +71,46 @@ export async function sendEmail(account: EmailAccount, options: SendEmailOptions
     accepted: result.accepted,
     rejected: result.rejected,
   };
+}
+
+// Send email via Gmail API (OAuth path)
+async function sendViaGmailApi(account: EmailAccount, options: SendEmailOptions) {
+  if (!account.oauth_access_token_encrypted || !account.oauth_refresh_token_encrypted) {
+    throw new Error('OAuth tokens are missing for this Gmail account');
+  }
+
+  const accessToken = await ensureValidToken({
+    id: account.id,
+    oauth_access_token_encrypted: account.oauth_access_token_encrypted,
+    oauth_refresh_token_encrypted: account.oauth_refresh_token_encrypted,
+    oauth_token_expires_at: account.oauth_token_expires_at,
+    oauth_scope: account.oauth_scope,
+  });
+
+  const fromName = account.display_name || account.email_address;
+  const from = `"${fromName}" <${account.email_address}>`;
+
+  const result = await sendGmailMessage(
+    accessToken,
+    from,
+    options.to,
+    options.subject,
+    options.html,
+  );
+
+  return {
+    messageId: result.id,
+    accepted: [options.to],
+    rejected: [] as string[],
+  };
+}
+
+// Unified send — routes to Gmail API or SMTP based on auth_type
+export async function sendEmail(account: EmailAccount, options: SendEmailOptions) {
+  if (account.auth_type === 'oauth_gmail') {
+    return sendViaGmailApi(account, options);
+  }
+  return sendViaSmtp(account, options);
 }
 
 export async function verifyConnection(account: {

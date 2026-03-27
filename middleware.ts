@@ -12,7 +12,7 @@ const publicRoutes = ['/login', '/signup', '/vip'];
 const protectedRoutes = ['/', '/admin', '/outreach', '/funnel-builder', '/leads', '/offer', '/onboarding', '/crm', '/campaigns'];
 
 // API routes that don't require authentication
-const publicApiRoutes = ['/api/auth/login', '/api/auth/signup', '/api/auth/vip-signup', '/api/webhooks/zapier', '/api/onboarding'];
+const publicApiRoutes = ['/api/auth/login', '/api/auth/signup', '/api/auth/vip-signup', '/api/auth/google/callback', '/api/webhooks/zapier', '/api/onboarding'];
 
 async function verifyTokenEdge(token: string): Promise<boolean> {
   try {

@@ -578,10 +578,15 @@ export interface EmailAccountRow {
   user_id: number;
   email_address: string;
   display_name: string | null;
-  smtp_host: string;
+  smtp_host: string | null;
   smtp_port: number;
-  smtp_username: string;
-  smtp_password_encrypted: string;
+  smtp_username: string | null;
+  smtp_password_encrypted: string | null;
+  auth_type: 'smtp' | 'oauth_gmail';
+  oauth_access_token_encrypted: string | null;
+  oauth_refresh_token_encrypted: string | null;
+  oauth_token_expires_at: string | null;
+  oauth_scope: string | null;
   is_active: boolean;
   daily_send_limit: number;
   sends_today: number;
