@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import DashboardWrapper from '@/components/DashboardWrapper';
 
 interface Campaign {
   id: number;
@@ -141,6 +142,7 @@ export default function CampaignsPage() {
     setSelectedNicheIds(new Set());
   }
 
+  const renderContent = () => {
   // ============ LIST VIEW ============
   if (step === 'list') {
     return (
@@ -418,6 +420,9 @@ export default function CampaignsPage() {
   }
 
   return null;
+  };
+
+  return <DashboardWrapper>{renderContent()}</DashboardWrapper>;
 }
 
 // ============ COMPONENTS ============

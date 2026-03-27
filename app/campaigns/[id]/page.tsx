@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import DashboardWrapper from '@/components/DashboardWrapper';
 
 interface Campaign {
   id: number;
@@ -108,14 +109,16 @@ export default function CampaignDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-      </div>
+      <DashboardWrapper>
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </DashboardWrapper>
     );
   }
 
   if (!campaign) {
-    return <p className="text-[var(--text-secondary)]">Campaign not found.</p>;
+    return <DashboardWrapper><p className="text-[var(--text-secondary)]">Campaign not found.</p></DashboardWrapper>;
   }
 
   const progress = campaign.total_niches > 0
@@ -132,7 +135,7 @@ export default function CampaignDashboard() {
   const nicheOptions = [...new Set(creators.map(c => c.niche_id))].filter(Boolean);
 
   return (
-    <div>
+    <DashboardWrapper><div>
       {/* Header */}
       <div className="flex items-center gap-2 mb-6">
         <a href="/campaigns" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
@@ -383,7 +386,7 @@ export default function CampaignDashboard() {
           </button>
         </div>
       )}
-    </div>
+    </div></DashboardWrapper>
   );
 }
 
