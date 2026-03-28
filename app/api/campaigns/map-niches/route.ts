@@ -21,8 +21,9 @@ export async function POST(request: NextRequest) {
     const niches = await mapOfferToNiches(offer_description, target_market);
 
     return NextResponse.json({ niches });
-  } catch (error) {
-    console.error('Map niches error:', error);
-    return NextResponse.json({ error: 'Failed to map niches' }, { status: 500 });
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('Map niches error:', errMsg);
+    return NextResponse.json({ error: `Failed to map niches: ${errMsg}` }, { status: 500 });
   }
 }

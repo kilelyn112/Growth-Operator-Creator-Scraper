@@ -76,7 +76,15 @@ export default function CampaignsPage() {
         body: JSON.stringify({ offer_description: offerDescription, target_market: targetMarket }),
       });
       const data = await res.json();
+      if (!res.ok || data.error) {
+        alert(data.error || 'Failed to map niches. Please try again.');
+        return;
+      }
       const niches = data.niches || [];
+      if (niches.length === 0) {
+        alert('AI returned 0 niches. Try being more specific about your offer and target market.');
+        return;
+      }
       setSuggestedNiches(niches);
       // Auto-select high and medium relevance
       const autoSelect = new Set<string>(
@@ -86,6 +94,7 @@ export default function CampaignsPage() {
       setStep('select_niches');
     } catch (e) {
       console.error(e);
+      alert('Network error — could not reach the server.');
     } finally {
       setMappingLoading(false);
     }
