@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SMTP_PRESETS } from '@/lib/email-constants';
 
@@ -37,6 +37,14 @@ interface UserSession {
 type View = 'accounts' | 'compose' | 'history';
 
 export default function OutreachPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
+      <OutreachContent />
+    </Suspense>
+  );
+}
+
+function OutreachContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [session, setSession] = useState<UserSession | null>(null);
