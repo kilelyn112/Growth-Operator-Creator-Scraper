@@ -126,6 +126,7 @@ export async function verifyConnection(account: {
       port: account.smtp_port,
       secure: account.smtp_port === 465,
       family: 4,
+      connectionTimeout: 10000,
       auth: {
         user: account.smtp_username,
         pass: account.smtp_password,
@@ -135,9 +136,17 @@ export async function verifyConnection(account: {
     await transport.verify();
     return { success: true };
   } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to connect';
+    // Detect Railway SMTP blocking
+    if (msg.includes('ENETUNREACH') || msg.includes('timeout') || msg.includes('ETIMEDOUT')) {
+      return {
+        success: false,
+        error: 'SMTP connection blocked by server. Use the "Connect Gmail" button above instead — it connects via Google OAuth and works everywhere.',
+      };
+    }
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Failed to connect',
+      error: msg,
     };
   }
 }
