@@ -45,6 +45,7 @@ function createTransport(account: EmailAccount) {
     host: account.smtp_host,
     port: account.smtp_port,
     secure: account.smtp_port === 465,
+    family: 4,
     auth: {
       user: account.smtp_username,
       pass: password,
@@ -124,6 +125,7 @@ export async function verifyConnection(account: {
       host: account.smtp_host,
       port: account.smtp_port,
       secure: account.smtp_port === 465,
+      family: 4,
       auth: {
         user: account.smtp_username,
         pass: account.smtp_password,
