@@ -15,8 +15,9 @@ export async function GET() {
     const url = getGoogleAuthUrl(state);
 
     return NextResponse.redirect(url);
-  } catch (error) {
-    console.error('Google OAuth start error:', error);
-    return NextResponse.json({ error: 'Failed to start OAuth flow' }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Google OAuth start error:', msg);
+    return NextResponse.json({ error: `Failed to start OAuth flow: ${msg}` }, { status: 500 });
   }
 }
