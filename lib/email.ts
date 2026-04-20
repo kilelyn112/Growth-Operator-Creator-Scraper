@@ -1,5 +1,6 @@
 // Server-only — do NOT import from client components
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { decrypt } from './email-crypto';
 import { ensureValidToken, sendGmailMessage } from './gmail';
 export { interpolateTemplate } from './email-constants';
@@ -50,7 +51,7 @@ function createTransport(account: EmailAccount) {
       user: account.smtp_username,
       pass: password,
     },
-  });
+  } as SMTPTransport.Options);
 }
 
 // Send email via SMTP (existing path)
@@ -131,7 +132,7 @@ export async function verifyConnection(account: {
         user: account.smtp_username,
         pass: account.smtp_password,
       },
-    });
+    } as SMTPTransport.Options);
 
     await transport.verify();
     return { success: true };
