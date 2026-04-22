@@ -39,8 +39,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email account is deactivated' }, { status: 400 });
     }
 
-    // Check daily send limit
-    if (account.sends_today >= account.daily_send_limit) {
+    // Check daily send limit — treat counter as 0 if the reset window has already passed
+    // (the actual reset happens in incrementSendCount on the next successful send)
+    const resetAt = account.sends_reset_at ? new Date(account.sends_reset_at) : null;
+    const effectiveSendsToday = !resetAt || new Date() > resetAt ? 0 : account.sends_today;
+    if (effectiveSendsToday >= account.daily_send_limit) {
       return NextResponse.json({
         error: `Daily send limit reached (${account.daily_send_limit}). Try again tomorrow.`,
       }, { status: 429 });
